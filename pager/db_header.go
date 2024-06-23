@@ -21,7 +21,7 @@ type DatabaseHeader struct {
 func NewDefaultDatabaseHeader() *DatabaseHeader {
 	header := &DatabaseHeader{
 		PageSizeBytes: 4096,
-		PageCount:     1,
+		PageCount:     0,
 		RootPageId:    0,
 	}
 

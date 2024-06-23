@@ -100,16 +100,15 @@ func (p *Pager) WritePage(pageId uint32, data []byte) error {
 	return nil
 }
 
-func (p *Pager) WriteNewPage(data []byte) error {
+func (p *Pager) WriteNewPage(data []byte) (uint32, error) {
 	newPageId := p.header.PageCount
 	if err := p.WritePage(newPageId, data); err != nil {
-		return err
+		return 0, err
 	}
 
 	p.header.PageCount += 1
 	if err := p.FlushDatabaseHeader(); err != nil {
-		return fmt.Errorf("failed to update database header after writing a new page: %v", err)
+		return 0, fmt.Errorf("failed to update database header after writing a new page: %v", err)
 	}
-
-	return nil
+	return newPageId, nil
 }
