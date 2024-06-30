@@ -1,6 +1,7 @@
 package pager
 
 import (
+	"bricker-db/btree/node"
 	"errors"
 	"fmt"
 	"os"
@@ -98,6 +99,15 @@ func (p *Pager) WritePage(pageId uint32, data []byte) error {
 	}
 
 	return nil
+}
+
+func (p *Pager) WriteLeafNodeToPage(pageId uint32, leafNode *node.LeafNode) error {
+	buf, encodeErr := EncodeLeafNode(leafNode)
+	if encodeErr != nil {
+		return encodeErr
+	}
+
+	return p.WritePage(pageId, buf)
 }
 
 func (p *Pager) WriteNewPage(data []byte) (uint32, error) {
