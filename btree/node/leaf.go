@@ -71,14 +71,19 @@ func (l *LeafNode) Insert(key uint32, data []byte) (*KeyDataReference, error) {
 		return nil, fmt.Errorf("failed to encode key data ref: %v", encodingErr)
 	}
 
+	// offset existing keys
 	if index < l.header.elementsCount {
-		// todo: shift
-	} else {
-		keyDataOffset := index * KEY_DATA_REF_SIZE
-		numOfCopiedBytes := copy(l.buf[keyDataOffset:(keyDataOffset+KEY_DATA_REF_SIZE)], keyData)
-		if numOfCopiedBytes != KEY_DATA_REF_SIZE {
-			return nil, ErrFailedToInsertKeyDataRef
+		offsetStart := index * KEY_DATA_REF_SIZE
+		offsetEnd := l.header.elementsCount * KEY_DATA_REF_SIZE
+		if copiedBytes := copy(l.buf[(offsetStart+KEY_DATA_REF_SIZE):], l.buf[offsetStart:offsetEnd]); copiedBytes != int(offsetEnd-offsetStart) {
+			return nil, errors.New("failed to shift existing keys")
+
 		}
+	}
+
+	keyDataOffset := index * KEY_DATA_REF_SIZE
+	if numOfCopiedBytes := copy(l.buf[keyDataOffset:(keyDataOffset+KEY_DATA_REF_SIZE)], keyData); numOfCopiedBytes != KEY_DATA_REF_SIZE {
+		return nil, ErrFailedToInsertKeyDataRef
 	}
 
 	// copy over buffer
@@ -94,6 +99,10 @@ func (l *LeafNode) Insert(key uint32, data []byte) (*KeyDataReference, error) {
 	l.header.freeSpaceEndOffset -= dataSize
 
 	return keyDataRef, nil
+}
+
+func (l *LeafNode) getKeyRefData(keyDataRef *KeyDataReference) []byte {
+	return l.buf[keyDataRef.Offset:(keyDataRef.Offset + keyDataRef.Length)]
 }
 
 func (l *LeafNode) getKeyRefByIndex(index uint32) (*KeyDataReference, error) {
@@ -125,4 +134,8 @@ func (l *LeafNode) findPositionForKey(key uint32) (bool, uint32, error) {
 
 	return false, start, nil
 
+}
+
+func (l *LeafNode) GetElementsCount() uint32 {
+	return l.header.elementsCount
 }
