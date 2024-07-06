@@ -7,3 +7,8 @@ type KeyDataReference struct {
 	Offset uint32
 	Length uint32
 }
+
+type KeyDataReferenceCommit struct {
+	keyDataRef *KeyDataReference
+	committed  bool
+}

@@ -12,7 +12,8 @@ func TestInsertIntoLeafNode(t *testing.T) {
 	data := []byte("data")
 	key := uint32(1)
 
-	keyDataRef, insertErr := leaf.Insert(key, data)
+	insertResult, insertErr := leaf.Insert(key, data)
+	keyDataRef := insertResult.InsertedKeyDataRef
 	assert.NoError(t, insertErr)
 	assert.Equal(t, key, keyDataRef.Key)
 	assert.Equal(t, uint32(len(data)), keyDataRef.Length)
@@ -40,11 +41,13 @@ func TestInsertBeforeExistingElementIntoLeafNode(t *testing.T) {
 	leaf := NewEmptyLeafNode(1024)
 
 	key1Data := []byte("key1Data")
-	key1DataRef, insertErr := leaf.Insert(uint32(1), key1Data)
+	insert1Result, insertErr := leaf.Insert(uint32(1), key1Data)
+	key1DataRef := insert1Result.InsertedKeyDataRef
 	assert.NoError(t, insertErr)
 
 	key2Data := []byte("key2Data")
-	key2DataRef, insert2Err := leaf.Insert(uint32(0), key2Data)
+	insert2Result, insert2Err := leaf.Insert(uint32(0), key2Data)
+	key2DataRef := insert2Result.InsertedKeyDataRef
 	assert.NoError(t, insert2Err)
 
 	// check order

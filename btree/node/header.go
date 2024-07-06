@@ -9,6 +9,7 @@ const (
 
 type NodeHeader struct {
 	nodeType             NodeType
+	nodeSize             uint32
 	freeSpaceStartOffset uint32
 	freeSpaceEndOffset   uint32
 	elementsCount        uint32

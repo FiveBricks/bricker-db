@@ -3,11 +3,18 @@ package node
 import (
 	"errors"
 	"fmt"
+
+	"golang.org/x/exp/slices"
 )
 
 type LeafNode struct {
 	header *NodeHeader
 	buf    []byte
+}
+
+type LeafNodeInsertResult struct {
+	InsertedKeyDataRef *KeyDataReference
+	Metadata           *InsertMetadata
 }
 
 const NODE_HEADER_SIZE = 100
@@ -21,6 +28,7 @@ func NewEmptyLeafNode(size uint32) *LeafNode {
 	return &LeafNode{
 		&NodeHeader{
 			LeafNodeType,
+			size,
 			NODE_HEADER_SIZE,
 			size,
 			0,
@@ -40,7 +48,39 @@ func (l *LeafNode) availableSpace() uint32 {
 	return l.header.freeSpaceEndOffset - l.header.freeSpaceStartOffset
 }
 
-func (l *LeafNode) Insert(key uint32, data []byte) (*KeyDataReference, error) {
+func (l *LeafNode) Insert(key uint32, data []byte) (*LeafNodeInsertResult, error) {
+	dataSize := uint32(len(data))
+	requiedSpace := KEY_DATA_REF_SIZE + dataSize
+	if l.availableSpace() < requiedSpace {
+		// if required space is smaller than half of the node size, we should be able
+		// to insert the data after a split
+		if requiedSpace < (l.header.nodeSize / 2) {
+			return l.splitAndInsert(key, data)
+
+		}
+
+		return nil, ErrNoAvailableSpaceForInsert
+	}
+
+	// find position for the new key
+	exists, index, err := l.findPositionForKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find position of key %d: %v", key, err)
+	}
+
+	if exists {
+		return nil, errors.New("insert of existing keys is not supported")
+	}
+
+	keyRef, insertErr := l.insertToIndex(index, key, data)
+	if insertErr != nil {
+		return nil, insertErr
+	}
+
+	return &LeafNodeInsertResult{keyRef, &InsertMetadata{nil}}, nil
+}
+
+func (l *LeafNode) insertToIndex(index uint32, key uint32, data []byte) (*KeyDataReference, error) {
 	dataSize := uint32(len(data))
 	requiedSpace := KEY_DATA_REF_SIZE + dataSize
 	if l.availableSpace() < requiedSpace {
@@ -54,16 +94,6 @@ func (l *LeafNode) Insert(key uint32, data []byte) (*KeyDataReference, error) {
 		key,
 		startDataOffset,
 		dataSize,
-	}
-
-	// insert key at the right spot (possibly offset the rest)
-	exists, index, err := l.findPositionForKey(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find position of key %d: %v", key, err)
-	}
-
-	if exists {
-		return nil, errors.New("insert of existing keys is not supported")
 	}
 
 	keyData, encodingErr := EncodeKeyDataRef(keyDataRef)
@@ -101,14 +131,112 @@ func (l *LeafNode) Insert(key uint32, data []byte) (*KeyDataReference, error) {
 	return keyDataRef, nil
 }
 
-func (l *LeafNode) getKeyRefData(keyDataRef *KeyDataReference) []byte {
-	return l.buf[keyDataRef.Offset:(keyDataRef.Offset + keyDataRef.Length)]
+func (l *LeafNode) append(key uint32, data []byte) (*KeyDataReference, error) {
+	index := l.header.elementsCount
+	return l.insertToIndex(index, key, data)
+}
+
+func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResult, error) {
+	var keyRefs []*KeyDataReference
+	for i := uint32(0); i < l.header.elementsCount; i++ {
+		ref, err := l.getKeyRefByIndex(i)
+		if err != nil {
+			return nil, err
+		}
+
+		keyRefs = append(keyRefs, ref)
+	}
+
+	var keyRefsCommit []*KeyDataReferenceCommit
+	for _, keyRef := range keyRefs {
+		keyRefsCommit = append(keyRefsCommit, &KeyDataReferenceCommit{keyRef, true})
+	}
+
+	exist, newItemPosition := l.findPositionForKeyInRefs(key, keyRefs)
+	if exist {
+		return nil, errors.New("cannot insert to an existing position")
+	}
+
+	newItemKeyRef := &KeyDataReference{key, 0, 0}
+	slices.Insert(keyRefsCommit, int(newItemPosition), &KeyDataReferenceCommit{newItemKeyRef, false})
+
+	splitPoint := len(keyRefsCommit) / 2
+	splitKey := keyRefsCommit[splitPoint].keyDataRef.Key
+
+	newNode := NewEmptyLeafNode(l.header.nodeSize)
+	newNodeItems := keyRefsCommit[splitPoint:]
+
+	var insertedKeyRer *KeyDataReference
+	for _, item := range newNodeItems {
+		ref := item.keyDataRef
+		var itemData []byte
+		if item.committed {
+			itemData = l.buf[ref.Offset:(ref.Offset + ref.Length)]
+		} else {
+			itemData = data
+		}
+
+		appendedKeyRef, appendErr := newNode.append(item.keyDataRef.Key, itemData)
+		if appendErr != nil {
+			return nil, fmt.Errorf("failed to copy data to new node: %w", appendErr)
+		}
+
+		if !item.committed {
+			insertedKeyRer = appendedKeyRef
+		}
+	}
+
+	// delete moved items in old node, starting from back
+	newNodesLen := len(newNodeItems)
+	for i := newNodesLen - 1; i >= 0; i-- {
+		item := newNodeItems[i]
+		if item.committed {
+			if err := l.deleteLastKeyRef(); err != nil {
+				return nil, fmt.Errorf("failed to delete moved key: %w", err)
+			}
+		}
+	}
+
+	// insert new item to old node if needed
+	if newItemPosition < uint32(splitPoint) {
+		keyRef, insertErr := l.insertToIndex(newItemPosition, key, data)
+		if insertErr != nil {
+			return nil, insertErr
+		}
+
+		insertedKeyRer = keyRef
+	}
+
+	return &LeafNodeInsertResult{insertedKeyRer, &InsertMetadata{&SplitMetadata{splitKey}}}, nil
 }
 
 func (l *LeafNode) getKeyRefByIndex(index uint32) (*KeyDataReference, error) {
 	offset := index * KEY_DATA_REF_SIZE
 	keyData := l.buf[offset:(offset + KEY_DATA_REF_SIZE)]
 	return DecodeKeyDataRef(keyData)
+}
+
+func (l *LeafNode) deleteKeyRefByIndex(index uint32) (*KeyDataReference, error) {
+	offset := index * KEY_DATA_REF_SIZE
+	keyData := l.buf[offset:(offset + KEY_DATA_REF_SIZE)]
+	return DecodeKeyDataRef(keyData)
+}
+
+func (l *LeafNode) deleteLastKeyRef() error {
+	keyRef, err := l.getKeyRefByIndex(l.header.elementsCount - 1)
+	if err != nil {
+		return err
+	}
+
+	// delete key ref
+	l.header.freeSpaceStartOffset -= KEY_DATA_REF_SIZE
+	l.header.freeSpaceEndOffset += keyRef.Length
+	l.header.elementsCount -= 1
+
+	// todo: remove data
+	// todo: flush
+
+	return nil
 }
 
 func (l *LeafNode) findPositionForKey(key uint32) (bool, uint32, error) {
@@ -136,6 +264,31 @@ func (l *LeafNode) findPositionForKey(key uint32) (bool, uint32, error) {
 
 }
 
+func (l *LeafNode) findPositionForKeyInRefs(key uint32, refs []*KeyDataReference) (bool, uint32) {
+	start := uint32(0)
+	end := uint32(len(refs))
+	for start < end {
+		middle := (start + end) / 2
+		middleKeyDataRef := refs[middle]
+
+		if middleKeyDataRef.Key == key {
+			return true, middle
+		}
+
+		if middleKeyDataRef.Key < key {
+			start = middle + 1
+		} else {
+			end = middle
+		}
+	}
+
+	return false, start
+}
+
 func (l *LeafNode) GetElementsCount() uint32 {
 	return l.header.elementsCount
+}
+
+func (l *LeafNode) getKeyRefData(keyDataRef *KeyDataReference) []byte {
+	return l.buf[keyDataRef.Offset:(keyDataRef.Offset + keyDataRef.Length)]
 }
