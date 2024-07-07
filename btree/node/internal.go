@@ -13,7 +13,7 @@ type InternalNode struct {
 }
 
 type InternalNodeInsertResult struct {
-	InsertedKeyDataRef *KeyPageReference
+	InsertedKeyPageRef *KeyPageReference
 	Metadata           *InsertMetadata
 }
 
