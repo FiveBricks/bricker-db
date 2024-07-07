@@ -80,7 +80,7 @@ func TestInsertAndSplit(t *testing.T) {
 	assert.ErrorIs(t, ErrKeyRefAtIndexDoesNotExist, getKey2Err)
 
 	// check new leaf
-	newLeaf := insert2Result.Metadata.Split.CreatedNode
+	newLeaf := insert2Result.Metadata.Split.CreatedNode.(*LeafNode)
 	assert.Equal(t, uint32(1), newLeaf.GetElementsCount())
 	firstKeyInNewLeaf, getKeyInNewLeafErr := newLeaf.getKeyDataRefByIndex(0)
 	assert.NoError(t, getKeyInNewLeafErr)

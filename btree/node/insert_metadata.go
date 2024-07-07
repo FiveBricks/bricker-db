@@ -6,5 +6,5 @@ type InsertMetadata struct {
 
 type SplitMetadata struct {
 	SplitKey    uint32
-	CreatedNode *LeafNode
+	CreatedNode Node
 }
