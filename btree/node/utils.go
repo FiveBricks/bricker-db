@@ -5,16 +5,16 @@ func FindPositionForKey(node Node, key uint32) (bool, uint32, error) {
 	end := node.GetElementsCount()
 	for start < end {
 		middle := (start + end) / 2
-		middleKeyDataRef, err := node.GetKeyRefeferenceByIndex(middle)
+		middleKeyRef, err := node.GetKeyRefeferenceByIndex(middle)
 		if err != nil {
 			return false, 0, err
 		}
 
-		if middleKeyDataRef.GetKey() == key {
+		if middleKeyRef.GetKey() == key {
 			return true, middle, nil
 		}
 
-		if middleKeyDataRef.GetKey() < key {
+		if middleKeyRef.GetKey() < key {
 			start = middle + 1
 		} else {
 			end = middle
@@ -22,4 +22,25 @@ func FindPositionForKey(node Node, key uint32) (bool, uint32, error) {
 	}
 
 	return false, start, nil
+}
+
+func FindPositionForKeyInRefs[T KeyReference](key uint32, refs []T) (bool, uint32) {
+	start := uint32(0)
+	end := uint32(len(refs))
+	for start < end {
+		middle := (start + end) / 2
+		middleKeyRef := refs[middle]
+
+		if middleKeyRef.GetKey() == key {
+			return true, middle
+		}
+
+		if middleKeyRef.GetKey() < key {
+			start = middle + 1
+		} else {
+			end = middle
+		}
+	}
+
+	return false, start
 }

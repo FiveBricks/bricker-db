@@ -147,7 +147,7 @@ func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResul
 		keyRefsCommit = append(keyRefsCommit, &KeyDataReferenceCommit{keyRef, true})
 	}
 
-	exist, newItemPosition := l.findPositionForKeyInRefs(key, keyRefs)
+	exist, newItemPosition := FindPositionForKeyInRefs(key, keyRefs)
 	if exist {
 		return nil, errors.New("cannot insert to an existing position")
 	}
@@ -233,27 +233,6 @@ func (l *LeafNode) deleteLastKeyRef() error {
 	// todo: remove data & flush
 
 	return nil
-}
-
-func (l *LeafNode) findPositionForKeyInRefs(key uint32, refs []*KeyDataReference) (bool, uint32) {
-	start := uint32(0)
-	end := uint32(len(refs))
-	for start < end {
-		middle := (start + end) / 2
-		middleKeyDataRef := refs[middle]
-
-		if middleKeyDataRef.Key == key {
-			return true, middle
-		}
-
-		if middleKeyDataRef.Key < key {
-			start = middle + 1
-		} else {
-			end = middle
-		}
-	}
-
-	return false, start
 }
 
 func (l *LeafNode) GetElementsCount() uint32 {
