@@ -219,12 +219,6 @@ func (l *LeafNode) GetKeyRefeferenceByIndex(index uint32) (KeyReference, error) 
 	return l.getKeyDataRefByIndex(index)
 }
 
-func (l *LeafNode) deleteKeyRefByIndex(index uint32) (*KeyDataReference, error) {
-	offset := index * KEY_DATA_REF_SIZE
-	keyData := l.buf[offset:(offset + KEY_DATA_REF_SIZE)]
-	return DecodeKeyDataRef(keyData)
-}
-
 func (l *LeafNode) deleteLastKeyRef() error {
 	keyRef, err := l.getKeyDataRefByIndex(l.header.elementsCount - 1)
 	if err != nil {
@@ -236,8 +230,7 @@ func (l *LeafNode) deleteLastKeyRef() error {
 	l.header.freeSpaceEndOffset += keyRef.Length
 	l.header.elementsCount -= 1
 
-	// todo: remove data
-	// todo: flush
+	// todo: remove data & flush
 
 	return nil
 }
