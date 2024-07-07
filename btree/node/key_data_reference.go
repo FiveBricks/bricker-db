@@ -8,6 +8,10 @@ type KeyDataReference struct {
 	Length uint32
 }
 
+func (k *KeyDataReference) GetKey() uint32 {
+	return k.Key
+}
+
 type KeyDataReferenceCommit struct {
 	keyDataRef *KeyDataReference
 	committed  bool

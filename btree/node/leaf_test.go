@@ -22,21 +22,6 @@ func TestInsertIntoLeafNode(t *testing.T) {
 	assert.Equal(t, uint32(1), leaf.GetElementsCount())
 }
 
-func TestFindPositionForKey(t *testing.T) {
-	leaf := NewEmptyLeafNode(1024)
-	data := []byte("data")
-	key := uint32(1)
-
-	_, insertErr := leaf.Insert(key, data)
-	assert.NoError(t, insertErr)
-
-	key2 := uint32(0)
-	exists, index, err := leaf.findPositionForKey(key2)
-	assert.NoError(t, err)
-	assert.False(t, exists)
-	assert.Equal(t, uint32(0), index)
-}
-
 func TestInsertBeforeExistingElementIntoLeafNode(t *testing.T) {
 	leaf := NewEmptyLeafNode(1024)
 
@@ -51,11 +36,11 @@ func TestInsertBeforeExistingElementIntoLeafNode(t *testing.T) {
 	key2DataRef := insert2Result.InsertedKeyDataRef
 
 	// check order
-	firstKeyInLeaf, getKeyErr := leaf.getKeyRefByIndex(0)
+	firstKeyInLeaf, getKeyErr := leaf.getKeyDataRefByIndex(0)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key2DataRef, firstKeyInLeaf)
 
-	secondKeyInLeaf, getKeyErr := leaf.getKeyRefByIndex(1)
+	secondKeyInLeaf, getKeyErr := leaf.getKeyDataRefByIndex(1)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key1DataRef, secondKeyInLeaf)
 
@@ -85,24 +70,24 @@ func TestInsertAndSplit(t *testing.T) {
 
 	// check old leaf
 	assert.Equal(t, uint32(1), leaf.GetElementsCount())
-	firstKeyInOldLeaf, getKeyErr := leaf.getKeyRefByIndex(0)
+	firstKeyInOldLeaf, getKeyErr := leaf.getKeyDataRefByIndex(0)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key2DataRef, firstKeyInOldLeaf)
 	firstKeyInOldLeafData := leaf.getKeyRefData(firstKeyInOldLeaf)
 	assert.Equal(t, key2Data, firstKeyInOldLeafData)
 
-	_, getKey2Err := leaf.getKeyRefByIndex(1)
+	_, getKey2Err := leaf.getKeyDataRefByIndex(1)
 	assert.ErrorIs(t, ErrKeyRefAtIndexDoesNotExist, getKey2Err)
 
 	// check new leaf
 	newLeaf := insert2Result.Metadata.Split.CreatedNode
 	assert.Equal(t, uint32(1), newLeaf.GetElementsCount())
-	firstKeyInNewLeaf, getKeyInNewLeafErr := newLeaf.getKeyRefByIndex(0)
+	firstKeyInNewLeaf, getKeyInNewLeafErr := newLeaf.getKeyDataRefByIndex(0)
 	assert.NoError(t, getKeyInNewLeafErr)
 	assert.Equal(t, key1DataRef, firstKeyInNewLeaf)
 	firstKeyInNewLeafData := newLeaf.getKeyRefData(firstKeyInNewLeaf)
 	assert.Equal(t, key1Data, firstKeyInNewLeafData)
 
-	_, getKey2InNewLeafErr := newLeaf.getKeyRefByIndex(1)
+	_, getKey2InNewLeafErr := newLeaf.getKeyDataRefByIndex(1)
 	assert.ErrorIs(t, ErrKeyRefAtIndexDoesNotExist, getKey2InNewLeafErr)
 }

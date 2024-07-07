@@ -58,7 +58,7 @@ func (l *LeafNode) Insert(key uint32, data []byte) (*LeafNodeInsertResult, error
 	}
 
 	// find position for the new key
-	exists, index, err := l.findPositionForKey(key)
+	exists, index, err := FindPositionForKey(l, key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find position of key %d: %v", key, err)
 	}
@@ -134,7 +134,7 @@ func (l *LeafNode) append(key uint32, data []byte) (*KeyDataReference, error) {
 func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResult, error) {
 	var keyRefs []*KeyDataReference
 	for i := uint32(0); i < l.header.elementsCount; i++ {
-		ref, err := l.getKeyRefByIndex(i)
+		ref, err := l.getKeyDataRefByIndex(i)
 		if err != nil {
 			return nil, err
 		}
@@ -205,13 +205,18 @@ func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResul
 	return &LeafNodeInsertResult{insertedKeyRef, &InsertMetadata{&SplitMetadata{splitKey, newNode}}}, nil
 }
 
-func (l *LeafNode) getKeyRefByIndex(index uint32) (*KeyDataReference, error) {
+func (l *LeafNode) getKeyDataRefByIndex(index uint32) (*KeyDataReference, error) {
 	if !(index < l.GetElementsCount()) {
 		return nil, ErrKeyRefAtIndexDoesNotExist
 	}
 	offset := index * KEY_DATA_REF_SIZE
 	keyData := l.buf[offset:(offset + KEY_DATA_REF_SIZE)]
 	return DecodeKeyDataRef(keyData)
+}
+
+func (l *LeafNode) GetKeyRefeferenceByIndex(index uint32) (KeyReference, error) {
+	// wrapper to accommodate the node interface signature
+	return l.getKeyDataRefByIndex(index)
 }
 
 func (l *LeafNode) deleteKeyRefByIndex(index uint32) (*KeyDataReference, error) {
@@ -221,7 +226,7 @@ func (l *LeafNode) deleteKeyRefByIndex(index uint32) (*KeyDataReference, error) 
 }
 
 func (l *LeafNode) deleteLastKeyRef() error {
-	keyRef, err := l.getKeyRefByIndex(l.header.elementsCount - 1)
+	keyRef, err := l.getKeyDataRefByIndex(l.header.elementsCount - 1)
 	if err != nil {
 		return err
 	}
@@ -235,31 +240,6 @@ func (l *LeafNode) deleteLastKeyRef() error {
 	// todo: flush
 
 	return nil
-}
-
-func (l *LeafNode) findPositionForKey(key uint32) (bool, uint32, error) {
-	start := uint32(0)
-	end := l.header.elementsCount
-	for start < end {
-		middle := (start + end) / 2
-		middleKeyDataRef, err := l.getKeyRefByIndex(middle)
-		if err != nil {
-			return false, 0, err
-		}
-
-		if middleKeyDataRef.Key == key {
-			return true, middle, nil
-		}
-
-		if middleKeyDataRef.Key < key {
-			start = middle + 1
-		} else {
-			end = middle
-		}
-	}
-
-	return false, start, nil
-
 }
 
 func (l *LeafNode) findPositionForKeyInRefs(key uint32, refs []*KeyDataReference) (bool, uint32) {
