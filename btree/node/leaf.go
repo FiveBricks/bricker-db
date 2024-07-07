@@ -17,8 +17,6 @@ type LeafNodeInsertResult struct {
 	Metadata           *InsertMetadata
 }
 
-const NODE_HEADER_SIZE = 100
-
 var ErrNoAvailableSpaceForInsert = errors.New("there is not enough available space for insert")
 var ErrFailedToInsertData = errors.New("failed to insert data")
 var ErrFailedToInsertKeyDataRef = errors.New("failed to insert key data ref")
@@ -45,14 +43,10 @@ func NewLeafNode(header *NodeHeader, data []byte) *LeafNode {
 	}
 }
 
-func (l *LeafNode) availableSpace() uint32 {
-	return l.header.freeSpaceEndOffset - l.header.freeSpaceStartOffset
-}
-
 func (l *LeafNode) Insert(key uint32, data []byte) (*LeafNodeInsertResult, error) {
 	dataSize := uint32(len(data))
 	requiedSpace := KEY_DATA_REF_SIZE + dataSize
-	if l.availableSpace() < requiedSpace {
+	if l.header.GetAvailableSpace() < requiedSpace {
 		// if required space is smaller than half of the node size, we should be able
 		// to insert the data after a split
 		if requiedSpace < (l.header.nodeSize / 2) {
@@ -84,7 +78,7 @@ func (l *LeafNode) Insert(key uint32, data []byte) (*LeafNodeInsertResult, error
 func (l *LeafNode) insertToIndex(index uint32, key uint32, data []byte) (*KeyDataReference, error) {
 	dataSize := uint32(len(data))
 	requiedSpace := KEY_DATA_REF_SIZE + dataSize
-	if l.availableSpace() < requiedSpace {
+	if l.header.GetAvailableSpace() < requiedSpace {
 		return nil, ErrNoAvailableSpaceForInsert
 	}
 
@@ -138,7 +132,6 @@ func (l *LeafNode) append(key uint32, data []byte) (*KeyDataReference, error) {
 }
 
 func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResult, error) {
-	fmt.Println("############# inside split")
 	var keyRefs []*KeyDataReference
 	for i := uint32(0); i < l.header.elementsCount; i++ {
 		ref, err := l.getKeyRefByIndex(i)
@@ -162,7 +155,6 @@ func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResul
 	newItemKeyRef := &KeyDataReference{key, 0, 0}
 	keyRefsCommit = slices.Insert(keyRefsCommit, int(newItemPosition), &KeyDataReferenceCommit{newItemKeyRef, false})
 
-	fmt.Printf("############# len: %d\n", len(keyRefsCommit))
 	splitPoint := len(keyRefsCommit) / 2
 	splitKey := keyRefsCommit[splitPoint].keyDataRef.Key
 
@@ -200,7 +192,6 @@ func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResul
 		}
 	}
 
-	fmt.Printf("############# new position: %d, split point: %d\n", newItemPosition, splitPoint)
 	// insert new item to old node if needed
 	if newItemPosition < uint32(splitPoint) {
 		keyRef, insertErr := l.insertToIndex(newItemPosition, key, data)
