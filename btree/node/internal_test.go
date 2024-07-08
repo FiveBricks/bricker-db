@@ -44,3 +44,44 @@ func TestInsertBeforeExistingElementIntoInternalNode(t *testing.T) {
 	assert.Equal(t, key1PageRef, secondKeyInNode)
 	assert.Equal(t, key1Page, secondKeyInNode.PageId)
 }
+
+func TestInsertAndSplitIntoInternalNode(t *testing.T) {
+	node := NewEmptyInternalNode(250)
+
+	key1 := uint32(1)
+	key1Page := uint32(3)
+	insert1Result, insertErr := node.Insert(key1, key1Page)
+	assert.NoError(t, insertErr)
+	assert.Nil(t, insert1Result.Metadata.Split)
+	key1PageRef := insert1Result.InsertedKeyPageRef
+
+	key2 := uint32(0)
+	key2Page := uint32(5)
+	insert2Result, insert2Err := node.Insert(key2, key2Page)
+	assert.NoError(t, insert2Err)
+	assert.NotNil(t, insert2Result.Metadata.Split)
+	assert.Equal(t, key1PageRef.Key, insert2Result.Metadata.Split.SplitKey)
+	key2PageRef := insert2Result.InsertedKeyPageRef
+	assert.NotNil(t, key2PageRef)
+
+	// check old leaf
+	assert.Equal(t, uint32(1), node.GetElementsCount())
+	firstKeyInOldLeaf, getKeyErr := node.getKeyPageRefByIndex(0)
+	assert.NoError(t, getKeyErr)
+	assert.Equal(t, key2PageRef, firstKeyInOldLeaf)
+	assert.Equal(t, key2Page, firstKeyInOldLeaf.PageId)
+
+	_, getKey2Err := node.getKeyPageRefByIndex(1)
+	assert.ErrorIs(t, ErrKeyRefAtIndexDoesNotExist, getKey2Err)
+
+	// check new leaf
+	newLeaf := insert2Result.Metadata.Split.CreatedNode.(*InternalNode)
+	assert.Equal(t, uint32(1), newLeaf.GetElementsCount())
+	firstKeyInNewLeaf, getKeyInNewLeafErr := newLeaf.getKeyPageRefByIndex(0)
+	assert.NoError(t, getKeyInNewLeafErr)
+	assert.Equal(t, key1PageRef, firstKeyInNewLeaf)
+	assert.Equal(t, key1Page, firstKeyInNewLeaf.PageId)
+
+	_, getKey2InNewLeafErr := newLeaf.getKeyPageRefByIndex(1)
+	assert.ErrorIs(t, ErrKeyRefAtIndexDoesNotExist, getKey2InNewLeafErr)
+}
