@@ -3,6 +3,7 @@ package node
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"golang.org/x/exp/slices"
 )
@@ -23,7 +24,7 @@ func NewEmptyLeafNode(size uint32) *LeafNode {
 		&NodeHeader{
 			LeafNodeType,
 			size,
-			NODE_HEADER_SIZE,
+			0,
 			size,
 			0,
 		},
@@ -150,7 +151,7 @@ func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResul
 	newItemKeyRef := &KeyDataReference{key, 0, 0}
 	keyRefsCommit = slices.Insert(keyRefsCommit, int(newItemPosition), &KeyDataReferenceCommit{newItemKeyRef, false})
 
-	splitPoint := len(keyRefsCommit) / 2
+	splitPoint := int32(math.Ceil(float64(len(keyRefsCommit)) / 2))
 	splitKey := keyRefsCommit[splitPoint].keyDataRef.Key
 
 	newNode := NewEmptyLeafNode(l.header.nodeSize)
@@ -215,17 +216,12 @@ func (l *LeafNode) GetKeyRefeferenceByIndex(index uint32) (KeyReference, error) 
 }
 
 func (l *LeafNode) deleteLastKeyRef() error {
-	keyRef, err := l.getKeyDataRefByIndex(l.header.elementsCount - 1)
-	if err != nil {
-		return err
-	}
-
 	// delete key ref
 	l.header.freeSpaceStartOffset -= KEY_DATA_REF_SIZE
-	l.header.freeSpaceEndOffset += keyRef.Length
+	// l.header.freeSpaceEndOffset += keyRef.Length
 	l.header.elementsCount -= 1
 
-	// todo: remove data & flush
+	// todo: remove data & defragment & flush
 
 	return nil
 }
