@@ -29,7 +29,7 @@ func TestFixedSizeSliceWriterShouldWriteData(t *testing.T) {
 	assert.True(t, checkSliceIsZerosAfterIndex(len(text), buf))
 }
 
-func TestFixedSizeSliceWriterOverwritesData(t *testing.T) {
+func TestFixedSizeSliceWriterAppendsData(t *testing.T) {
 	data := []byte("asd")
 	buf := make([]byte, 10)
 	writer := NewFixedSizeSliceWriter(buf)
@@ -40,8 +40,8 @@ func TestFixedSizeSliceWriterOverwritesData(t *testing.T) {
 	newData := []byte(newText)
 	writer.Write(newData)
 
-	assert.Equal(t, buf[:len(newText)], []byte(newText))
-	assert.True(t, checkSliceIsZerosAfterIndex(len(newText), buf))
+	assert.Equal(t, buf[:len(data)], data)
+	assert.Equal(t, buf[len(data):(len(data)+len(newText))], newData)
 }
 
 func TestFixedSizeSliceWriterErrorsWhenTooMuchDataIsWritten(t *testing.T) {

@@ -9,8 +9,8 @@ import (
 )
 
 type LeafNode struct {
-	header *NodeHeader
-	buf    []byte
+	Header *NodeHeader
+	Buf    []byte
 }
 
 type LeafNodeInsertResult struct {
@@ -42,10 +42,10 @@ func NewLeafNode(header *NodeHeader, data []byte) *LeafNode {
 func (l *LeafNode) Insert(key uint32, data []byte) (*LeafNodeInsertResult, error) {
 	dataSize := uint32(len(data))
 	requiedSpace := KEY_DATA_REF_SIZE + dataSize
-	if l.header.GetAvailableSpace() < requiedSpace {
+	if l.Header.GetAvailableSpace() < requiedSpace {
 		// if required space is smaller than half of the node size, we should be able
 		// to insert the data after a split
-		if requiedSpace < (l.header.nodeSize / 2) {
+		if requiedSpace < (l.Header.nodeSize / 2) {
 			return l.splitAndInsert(key, data)
 
 		}
@@ -74,11 +74,11 @@ func (l *LeafNode) Insert(key uint32, data []byte) (*LeafNodeInsertResult, error
 func (l *LeafNode) insertToIndex(index uint32, key uint32, data []byte) (*KeyDataReference, error) {
 	dataSize := uint32(len(data))
 	requiedSpace := KEY_DATA_REF_SIZE + dataSize
-	if l.header.GetAvailableSpace() < requiedSpace {
+	if l.Header.GetAvailableSpace() < requiedSpace {
 		return nil, ErrNoAvailableSpaceForInsert
 	}
 
-	startDataOffset := l.header.freeSpaceEndOffset - dataSize
+	startDataOffset := l.Header.freeSpaceEndOffset - dataSize
 
 	// create key
 	keyDataRef := &KeyDataReference{
@@ -93,43 +93,43 @@ func (l *LeafNode) insertToIndex(index uint32, key uint32, data []byte) (*KeyDat
 	}
 
 	// offset existing keys
-	if index < l.header.elementsCount {
+	if index < l.Header.elementsCount {
 		offsetStart := index * KEY_DATA_REF_SIZE
-		offsetEnd := l.header.elementsCount * KEY_DATA_REF_SIZE
-		if copiedBytes := copy(l.buf[(offsetStart+KEY_DATA_REF_SIZE):], l.buf[offsetStart:offsetEnd]); copiedBytes != int(offsetEnd-offsetStart) {
+		offsetEnd := l.Header.elementsCount * KEY_DATA_REF_SIZE
+		if copiedBytes := copy(l.Buf[(offsetStart+KEY_DATA_REF_SIZE):], l.Buf[offsetStart:offsetEnd]); copiedBytes != int(offsetEnd-offsetStart) {
 			return nil, errors.New("failed to shift existing keys")
 
 		}
 	}
 
 	keyDataOffset := index * KEY_DATA_REF_SIZE
-	if numOfCopiedBytes := copy(l.buf[keyDataOffset:(keyDataOffset+KEY_DATA_REF_SIZE)], keyData); numOfCopiedBytes != KEY_DATA_REF_SIZE {
+	if numOfCopiedBytes := copy(l.Buf[keyDataOffset:(keyDataOffset+KEY_DATA_REF_SIZE)], keyData); numOfCopiedBytes != KEY_DATA_REF_SIZE {
 		return nil, ErrFailedToInsertKeyDataRef
 	}
 
 	// copy over buffer
-	numOfCopiedBytes := copy(l.buf[startDataOffset:(startDataOffset+dataSize)], data)
+	numOfCopiedBytes := copy(l.Buf[startDataOffset:(startDataOffset+dataSize)], data)
 	if numOfCopiedBytes != int(dataSize) {
 		return nil, ErrFailedToInsertData
 
 	}
 
 	// update header
-	l.header.elementsCount += 1
-	l.header.freeSpaceStartOffset += KEY_DATA_REF_SIZE
-	l.header.freeSpaceEndOffset -= dataSize
+	l.Header.elementsCount += 1
+	l.Header.freeSpaceStartOffset += KEY_DATA_REF_SIZE
+	l.Header.freeSpaceEndOffset -= dataSize
 
 	return keyDataRef, nil
 }
 
 func (l *LeafNode) append(key uint32, data []byte) (*KeyDataReference, error) {
-	index := l.header.elementsCount
+	index := l.Header.elementsCount
 	return l.insertToIndex(index, key, data)
 }
 
 func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResult, error) {
 	var keyRefs []*KeyDataReference
-	for i := uint32(0); i < l.header.elementsCount; i++ {
+	for i := uint32(0); i < l.Header.elementsCount; i++ {
 		ref, err := l.getKeyDataRefByIndex(i)
 		if err != nil {
 			return nil, err
@@ -154,7 +154,7 @@ func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResul
 	splitPoint := int32(math.Ceil(float64(len(keyRefsCommit)) / 2))
 	splitKey := keyRefsCommit[splitPoint].keyDataRef.Key
 
-	newNode := NewEmptyLeafNode(l.header.nodeSize)
+	newNode := NewEmptyLeafNode(l.Header.nodeSize)
 	newNodeItems := keyRefsCommit[splitPoint:]
 
 	var insertedKeyRef *KeyDataReference
@@ -162,7 +162,7 @@ func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResul
 		ref := item.keyDataRef
 		var itemData []byte
 		if item.committed {
-			itemData = l.buf[ref.Offset:(ref.Offset + ref.Length)]
+			itemData = l.Buf[ref.Offset:(ref.Offset + ref.Length)]
 		} else {
 			itemData = data
 		}
@@ -206,7 +206,7 @@ func (l *LeafNode) getKeyDataRefByIndex(index uint32) (*KeyDataReference, error)
 		return nil, ErrKeyRefAtIndexDoesNotExist
 	}
 	offset := index * KEY_DATA_REF_SIZE
-	keyData := l.buf[offset:(offset + KEY_DATA_REF_SIZE)]
+	keyData := l.Buf[offset:(offset + KEY_DATA_REF_SIZE)]
 	return DecodeKeyDataRef(keyData)
 }
 
@@ -217,9 +217,9 @@ func (l *LeafNode) GetKeyRefeferenceByIndex(index uint32) (KeyReference, error) 
 
 func (l *LeafNode) deleteLastKeyRef() error {
 	// delete key ref
-	l.header.freeSpaceStartOffset -= KEY_DATA_REF_SIZE
+	l.Header.freeSpaceStartOffset -= KEY_DATA_REF_SIZE
 	// l.header.freeSpaceEndOffset += keyRef.Length
-	l.header.elementsCount -= 1
+	l.Header.elementsCount -= 1
 
 	// todo: remove data & defragment & flush
 
@@ -227,9 +227,9 @@ func (l *LeafNode) deleteLastKeyRef() error {
 }
 
 func (l *LeafNode) GetElementsCount() uint32 {
-	return l.header.elementsCount
+	return l.Header.elementsCount
 }
 
 func (l *LeafNode) getKeyRefData(keyDataRef *KeyDataReference) []byte {
-	return l.buf[keyDataRef.Offset:(keyDataRef.Offset + keyDataRef.Length)]
+	return l.Buf[keyDataRef.Offset:(keyDataRef.Offset + keyDataRef.Length)]
 }
