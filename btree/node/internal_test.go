@@ -48,7 +48,7 @@ func TestInsertBeforeExistingElementIntoInternalNode(t *testing.T) {
 func TestInsertAndSplitIntoInternalNode(t *testing.T) {
 	node := NewEmptyInternalNode(250)
 
-	key1 := uint32(1)
+	key1 := uint32(2)
 	key1Page := uint32(3)
 	insert1Result, insertErr := node.Insert(key1, key1Page)
 	assert.NoError(t, insertErr)
@@ -58,24 +58,34 @@ func TestInsertAndSplitIntoInternalNode(t *testing.T) {
 	key2 := uint32(0)
 	key2Page := uint32(5)
 	insert2Result, insert2Err := node.Insert(key2, key2Page)
-	assert.NoError(t, insert2Err)
-	assert.NotNil(t, insert2Result.Metadata.Split)
-	assert.Equal(t, key1PageRef.Key, insert2Result.Metadata.Split.SplitKey)
 	key2PageRef := insert2Result.InsertedKeyPageRef
-	assert.NotNil(t, key2PageRef)
+	assert.NoError(t, insert2Err)
+	assert.Nil(t, insert2Result.Metadata.Split)
+
+	key3 := uint32(1)
+	key3Page := uint32(7)
+	insert3Result, insert3Err := node.Insert(key3, key3Page)
+	key3PageRef := insert3Result.InsertedKeyPageRef
+	assert.NoError(t, insert3Err)
+	assert.NotNil(t, insert3Result.Metadata.Split)
 
 	// check old leaf
-	assert.Equal(t, uint32(1), node.GetElementsCount())
+	assert.Equal(t, uint32(2), node.GetElementsCount())
 	firstKeyInOldLeaf, getKeyErr := node.getKeyPageRefByIndex(0)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key2PageRef, firstKeyInOldLeaf)
 	assert.Equal(t, key2Page, firstKeyInOldLeaf.PageId)
 
-	_, getKey2Err := node.getKeyPageRefByIndex(1)
+	secondKeyInOldLeaf, getKeyErr := node.getKeyPageRefByIndex(1)
+	assert.NoError(t, getKeyErr)
+	assert.Equal(t, key3PageRef, secondKeyInOldLeaf)
+	assert.Equal(t, key3Page, secondKeyInOldLeaf.PageId)
+
+	_, getKey2Err := node.getKeyPageRefByIndex(2)
 	assert.ErrorIs(t, ErrKeyRefAtIndexDoesNotExist, getKey2Err)
 
 	// check new leaf
-	newLeaf := insert2Result.Metadata.Split.CreatedNode.(*InternalNode)
+	newLeaf := insert3Result.Metadata.Split.CreatedNode.(*InternalNode)
 	assert.Equal(t, uint32(1), newLeaf.GetElementsCount())
 	firstKeyInNewLeaf, getKeyInNewLeafErr := newLeaf.getKeyPageRefByIndex(0)
 	assert.NoError(t, getKeyInNewLeafErr)

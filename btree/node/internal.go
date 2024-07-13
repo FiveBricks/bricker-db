@@ -3,6 +3,7 @@ package node
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"golang.org/x/exp/slices"
 )
@@ -23,7 +24,7 @@ func NewEmptyInternalNode(size uint32) *InternalNode {
 		&NodeHeader{
 			InternalNodeType,
 			size,
-			NODE_HEADER_SIZE,
+			0,
 			size,
 			0,
 		},
@@ -146,7 +147,7 @@ func (i *InternalNode) splitAndInsert(key uint32, pageId uint32) (*InternalNodeI
 	newItemKeyRef := &KeyPageReference{key, 0}
 	keyRefsCommit = slices.Insert(keyRefsCommit, int(newItemPosition), &KeyPageReferenceCommit{newItemKeyRef, false})
 
-	splitPoint := len(keyRefsCommit) / 2
+	splitPoint := int32(math.Ceil(float64(len(keyRefsCommit)) / 2))
 	splitKey := keyRefsCommit[splitPoint].keyPageRef.Key
 
 	newNode := NewEmptyInternalNode(i.header.nodeSize)
