@@ -43,7 +43,7 @@ func (i *InternalNode) Insert(key uint32, pageId uint32) (*InternalNodeInsertRes
 	if i.header.GetAvailableSpace() < KEY_PAGE_REF_SIZE {
 		// if required space is smaller than half of the node size, we should be able
 		// to insert the data after a split
-		if KEY_PAGE_REF_SIZE < (i.header.nodeSize / 2) {
+		if KEY_PAGE_REF_SIZE < (i.header.NodeSize / 2) {
 			return i.splitAndInsert(key, pageId)
 
 		}
@@ -87,8 +87,8 @@ func (i *InternalNode) insertToIndex(index uint32, key uint32, pageId uint32) (*
 
 	// offset existing keys
 	offsetStart := index * KEY_PAGE_REF_SIZE
-	if index < i.header.elementsCount {
-		offsetEnd := i.header.elementsCount * KEY_PAGE_REF_SIZE
+	if index < i.header.ElementsCount {
+		offsetEnd := i.header.ElementsCount * KEY_PAGE_REF_SIZE
 		if copiedBytes := copy(i.buf[(offsetStart+KEY_PAGE_REF_SIZE):], i.buf[offsetStart:offsetEnd]); copiedBytes != int(offsetEnd-offsetStart) {
 			return nil, errors.New("failed to shift existing key page refs")
 		}
@@ -99,14 +99,14 @@ func (i *InternalNode) insertToIndex(index uint32, key uint32, pageId uint32) (*
 	}
 
 	// update header
-	i.header.elementsCount += 1
-	i.header.freeSpaceStartOffset += KEY_PAGE_REF_SIZE
+	i.header.ElementsCount += 1
+	i.header.FreeSpaceStartOffset += KEY_PAGE_REF_SIZE
 
 	return keyPageRef, nil
 }
 
 func (i *InternalNode) GetElementsCount() uint32 {
-	return i.header.elementsCount
+	return i.header.ElementsCount
 }
 
 func (i *InternalNode) getKeyPageRefByIndex(index uint32) (*KeyPageReference, error) {
@@ -125,7 +125,7 @@ func (i *InternalNode) GetKeyRefeferenceByIndex(index uint32) (KeyReference, err
 
 func (i *InternalNode) splitAndInsert(key uint32, pageId uint32) (*InternalNodeInsertResult, error) {
 	var keyRefs []*KeyPageReference
-	for index := uint32(0); index < i.header.elementsCount; index++ {
+	for index := uint32(0); index < i.header.ElementsCount; index++ {
 		ref, err := i.getKeyPageRefByIndex(index)
 		if err != nil {
 			return nil, err
@@ -150,7 +150,7 @@ func (i *InternalNode) splitAndInsert(key uint32, pageId uint32) (*InternalNodeI
 	splitPoint := int32(math.Ceil(float64(len(keyRefsCommit)) / 2))
 	splitKey := keyRefsCommit[splitPoint].keyPageRef.Key
 
-	newNode := NewEmptyInternalNode(i.header.nodeSize)
+	newNode := NewEmptyInternalNode(i.header.NodeSize)
 	newNodeItems := keyRefsCommit[splitPoint:]
 
 	var insertedKeyRef *KeyPageReference
@@ -191,15 +191,23 @@ func (i *InternalNode) splitAndInsert(key uint32, pageId uint32) (*InternalNodeI
 }
 
 func (i *InternalNode) append(key uint32, pageId uint32) (*KeyPageReference, error) {
-	index := i.header.elementsCount
+	index := i.header.ElementsCount
 	return i.insertToIndex(index, key, pageId)
 }
 
 func (i *InternalNode) deleteLastKeyRef() error {
 	// delete key ref
-	i.header.freeSpaceStartOffset -= KEY_PAGE_REF_SIZE
-	i.header.elementsCount -= 1
+	i.header.FreeSpaceStartOffset -= KEY_PAGE_REF_SIZE
+	i.header.ElementsCount -= 1
 
 	// todo: remove data & flush
 	return nil
+}
+
+func (i *InternalNode) GetHeader() *NodeHeader {
+	return i.header
+}
+
+func (i *InternalNode) GetBuffer() []byte {
+	return i.buf
 }

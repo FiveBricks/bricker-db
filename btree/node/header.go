@@ -18,14 +18,14 @@ const NODE_HEADER_SIZE = 100
 
 type NodeHeader struct {
 	NodeType             NodeType
-	nodeSize             uint32
-	freeSpaceStartOffset uint32
-	freeSpaceEndOffset   uint32
-	elementsCount        uint32
+	NodeSize             uint32
+	FreeSpaceStartOffset uint32
+	FreeSpaceEndOffset   uint32
+	ElementsCount        uint32
 }
 
 func (h *NodeHeader) GetAvailableSpace() uint32 {
-	return h.freeSpaceEndOffset - h.freeSpaceStartOffset
+	return h.FreeSpaceEndOffset - h.FreeSpaceStartOffset
 }
 
 func (h *NodeHeader) Encoded() ([]byte, error) {

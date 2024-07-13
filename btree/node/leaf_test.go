@@ -36,18 +36,18 @@ func TestInsertBeforeExistingElementIntoLeafNode(t *testing.T) {
 	key2DataRef := insert2Result.InsertedKeyDataRef
 
 	// check order
-	firstKeyInLeaf, getKeyErr := leaf.getKeyDataRefByIndex(0)
+	firstKeyInLeaf, getKeyErr := leaf.GetKeyDataRefByIndex(0)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key2DataRef, firstKeyInLeaf)
 
-	secondKeyInLeaf, getKeyErr := leaf.getKeyDataRefByIndex(1)
+	secondKeyInLeaf, getKeyErr := leaf.GetKeyDataRefByIndex(1)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key1DataRef, secondKeyInLeaf)
 
 	// check data
-	firstKeyData := leaf.getKeyRefData(firstKeyInLeaf)
+	firstKeyData := leaf.GetKeyRefData(firstKeyInLeaf)
 	assert.Equal(t, key2Data, firstKeyData)
-	secondKeyData := leaf.getKeyRefData(secondKeyInLeaf)
+	secondKeyData := leaf.GetKeyRefData(secondKeyInLeaf)
 	assert.Equal(t, key1Data, secondKeyData)
 }
 
@@ -75,31 +75,31 @@ func TestInsertAndSplit(t *testing.T) {
 
 	// check old leaf
 	assert.Equal(t, uint32(2), leaf.GetElementsCount())
-	firstKeyInOldLeaf, getKeyErr := leaf.getKeyDataRefByIndex(0)
+	firstKeyInOldLeaf, getKeyErr := leaf.GetKeyDataRefByIndex(0)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key2DataRef, firstKeyInOldLeaf)
 	assert.Equal(t, key2DataRef.Key, uint32(0))
-	firstKeyInOldLeafData := leaf.getKeyRefData(firstKeyInOldLeaf)
+	firstKeyInOldLeafData := leaf.GetKeyRefData(firstKeyInOldLeaf)
 	assert.Equal(t, key2Data, firstKeyInOldLeafData)
 
-	secondKeyInOldLeaf, getKeyErr := leaf.getKeyDataRefByIndex(1)
+	secondKeyInOldLeaf, getKeyErr := leaf.GetKeyDataRefByIndex(1)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key3DataRef, secondKeyInOldLeaf)
-	secondKeyInOldLeafData := leaf.getKeyRefData(secondKeyInOldLeaf)
+	secondKeyInOldLeafData := leaf.GetKeyRefData(secondKeyInOldLeaf)
 	assert.Equal(t, key3Data, secondKeyInOldLeafData)
 
-	_, getKey3Err := leaf.getKeyDataRefByIndex(2)
+	_, getKey3Err := leaf.GetKeyDataRefByIndex(2)
 	assert.ErrorIs(t, ErrKeyRefAtIndexDoesNotExist, getKey3Err)
 
 	// check new leaf
 	newLeaf := insert3Result.Metadata.Split.CreatedNode.(*LeafNode)
 	assert.Equal(t, uint32(1), newLeaf.GetElementsCount())
-	firstKeyInNewLeaf, getKeyInNewLeafErr := newLeaf.getKeyDataRefByIndex(0)
+	firstKeyInNewLeaf, getKeyInNewLeafErr := newLeaf.GetKeyDataRefByIndex(0)
 	assert.NoError(t, getKeyInNewLeafErr)
 	assert.Equal(t, key1DataRef, firstKeyInNewLeaf)
-	firstKeyInNewLeafData := newLeaf.getKeyRefData(firstKeyInNewLeaf)
+	firstKeyInNewLeafData := newLeaf.GetKeyRefData(firstKeyInNewLeaf)
 	assert.Equal(t, key1Data, firstKeyInNewLeafData)
 
-	_, getKey2InNewLeafErr := newLeaf.getKeyDataRefByIndex(1)
+	_, getKey2InNewLeafErr := newLeaf.GetKeyDataRefByIndex(1)
 	assert.ErrorIs(t, ErrKeyRefAtIndexDoesNotExist, getKey2InNewLeafErr)
 }

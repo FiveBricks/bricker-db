@@ -101,8 +101,22 @@ func (p *Pager) WritePage(pageId uint32, data []byte) error {
 	return nil
 }
 
-func (p *Pager) WriteLeafNodeToPage(pageId uint32, leafNode *node.LeafNode) error {
-	buf, encodeErr := EncodeLeafNode(leafNode)
+func (p *Pager) ReadPagedNode(pageId uint32) (*PagedNode, error) {
+	pageData, pageDataErr := p.ReadPage(pageId)
+	if pageDataErr != nil {
+		return nil, pageDataErr
+	}
+
+	decodedNode, decodeErr := DecodeNode(pageData)
+	if decodeErr != nil {
+		return nil, decodeErr
+	}
+
+	return &PagedNode{pageId, decodedNode}, nil
+}
+
+func (p *Pager) WriteNodeToPage(pageId uint32, node node.Node) error {
+	buf, encodeErr := EncodeNode(node)
 	if encodeErr != nil {
 		return encodeErr
 	}
@@ -121,4 +135,22 @@ func (p *Pager) WriteNewPage(data []byte) (uint32, error) {
 		return 0, fmt.Errorf("failed to update database header after writing a new page: %v", err)
 	}
 	return newPageId, nil
+}
+
+func (p *Pager) WriteNewNode(node node.Node) (*PagedNode, error) {
+	newPageId := p.header.PageCount
+	pagedNode := &PagedNode{newPageId, node}
+	if writeErr := p.WritePagedNode(pagedNode); writeErr != nil {
+		return nil, writeErr
+	}
+
+	p.header.PageCount += 1
+	if err := p.FlushDatabaseHeader(); err != nil {
+		return nil, fmt.Errorf("failed to update database header after writing a new page: %v", err)
+	}
+	return pagedNode, nil
+}
+
+func (p *Pager) WritePagedNode(pagedNode *PagedNode) error {
+	return p.WriteNodeToPage(pagedNode.Page, pagedNode.Node)
 }

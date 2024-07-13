@@ -1,6 +1,7 @@
 package pager
 
 import (
+	"bricker-db/btree/node"
 	"bytes"
 	"errors"
 	"os"
@@ -117,4 +118,34 @@ func TestPagerReadingNonExistingPage(t *testing.T) {
 	assert.Nil(t, data)
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "failed to read page data")
+}
+
+func TestPagerWriteReadPagedNode(t *testing.T) {
+	tempDir := os.TempDir()
+	dbFileName := tempDir + "data.db"
+	defer os.Remove(dbFileName)
+
+	pager, pagerErr := NewPager(dbFileName)
+	assert.NoError(t, pagerErr)
+
+	leaf := node.NewEmptyLeafNode(1024)
+	key := uint32(0)
+	data := []byte("data")
+	_, insertErr := leaf.Insert(key, data)
+	assert.NoError(t, insertErr)
+
+	pagedNode, writeErr := pager.WriteNewNode(leaf)
+	assert.NoError(t, writeErr)
+
+	readPagedNode, readErr := pager.ReadPagedNode(pagedNode.Page)
+	assert.NoError(t, readErr)
+
+	readLeafNode := readPagedNode.Node.(*node.LeafNode)
+	assert.Equal(t, uint32(1), readLeafNode.GetElementsCount())
+	refKey, refKeyErr := readLeafNode.GetKeyDataRefByIndex(0)
+	assert.NoError(t, refKeyErr)
+	assert.Equal(t, key, refKey.GetKey())
+
+	readData := readLeafNode.GetKeyRefData(refKey)
+	assert.Equal(t, data, readData)
 }
