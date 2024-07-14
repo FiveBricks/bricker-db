@@ -10,7 +10,7 @@ func EncodeNode(node node.Node) ([]byte, error) {
 	buf := make([]byte, PAGE_SIZE)
 	writer := utils.NewFixedSizeSliceWriter(buf)
 
-	headerData, headerErr := node.GetHeader().Encoded()
+	headerData, headerErr := node.GetHeader().Encode()
 	if headerErr != nil {
 		return nil, fmt.Errorf("failed to encode leaf node header: %w", headerErr)
 	}

@@ -28,7 +28,7 @@ func (h *NodeHeader) GetAvailableSpace() uint32 {
 	return h.FreeSpaceEndOffset - h.FreeSpaceStartOffset
 }
 
-func (h *NodeHeader) Encoded() ([]byte, error) {
+func (h *NodeHeader) Encode() ([]byte, error) {
 	buf := make([]byte, NODE_HEADER_SIZE)
 	writer := utils.NewFixedSizeSliceWriter(buf)
 

@@ -101,6 +101,10 @@ func (p *Pager) WritePage(pageId uint32, data []byte) error {
 	return nil
 }
 
+func (p *Pager) ReadRootNode() (*PagedNode, error) {
+	return p.ReadPagedNode(p.header.RootPageId)
+}
+
 func (p *Pager) ReadPagedNode(pageId uint32) (*PagedNode, error) {
 	pageData, pageDataErr := p.ReadPage(pageId)
 	if pageDataErr != nil {
