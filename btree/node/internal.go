@@ -211,3 +211,17 @@ func (i *InternalNode) GetHeader() *NodeHeader {
 func (i *InternalNode) GetBuffer() []byte {
 	return i.buf
 }
+
+func (i *InternalNode) FindPositionForKey(key uint32) (uint32, error) {
+	_, index, err := FindPositionForKey(i, key)
+	if err != nil {
+		return 0, err
+	}
+
+	keyRef, keyRefErr := i.GetKeyRefeferenceByIndex(index)
+	if keyRefErr != nil {
+		return 0, keyRefErr
+	}
+
+	return keyRef.GetKey(), nil
+}
