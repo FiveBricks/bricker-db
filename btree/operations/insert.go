@@ -54,12 +54,12 @@ func findPosition(pager *pg.Pager, key uint32) ([]*Breadcrumb, error) {
 				return nil, fmt.Errorf("failed to cast internal node")
 			}
 
-			pageId, findErr := internalNode.FindPositionForKey(key)
+			keyRef, findErr := internalNode.FindPositionForKey(key)
 			if findErr != nil {
-				return nil, fmt.Errorf("failed to find position for %d: %w", findErr)
+				return nil, fmt.Errorf("failed to find position for %d: %w", key, findErr)
 			}
 
-			pagedNode, readErr := pager.ReadPagedNode(pageId)
+			pagedNode, readErr := pager.ReadPagedNode(keyRef.PageId)
 			if readErr != nil {
 				return nil, readErr
 			}

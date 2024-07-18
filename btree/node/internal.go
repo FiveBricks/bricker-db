@@ -212,16 +212,20 @@ func (i *InternalNode) GetBuffer() []byte {
 	return i.buf
 }
 
-func (i *InternalNode) FindPositionForKey(key uint32) (uint32, error) {
+func (i *InternalNode) FindPositionForKey(key uint32) (*KeyPageReference, error) {
 	_, index, err := FindPositionForKey(i, key)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	keyRef, keyRefErr := i.GetKeyRefeferenceByIndex(index)
+	if index == i.GetElementsCount() {
+		index = i.GetElementsCount() - 1
+	}
+
+	keyRef, keyRefErr := i.getKeyPageRefByIndex(index)
 	if keyRefErr != nil {
-		return 0, keyRefErr
+		return nil, keyRefErr
 	}
 
-	return keyRef.GetKey(), nil
+	return keyRef, nil
 }

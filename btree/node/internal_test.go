@@ -95,3 +95,22 @@ func TestInsertAndSplitIntoInternalNode(t *testing.T) {
 	_, getKey2InNewLeafErr := newLeaf.getKeyPageRefByIndex(1)
 	assert.ErrorIs(t, ErrKeyRefAtIndexDoesNotExist, getKey2InNewLeafErr)
 }
+
+func TestInternalNodeFindPositionForKey(t *testing.T) {
+	node := NewEmptyInternalNode(1024)
+	key1 := uint32(3)
+	_, insertErr := node.Insert(key1, uint32(0))
+	assert.NoError(t, insertErr)
+
+	key2 := uint32(5)
+	_, insert2Err := node.Insert(key2, uint32(1))
+	assert.NoError(t, insert2Err)
+
+	position, findErr := node.FindPositionForKey(uint32(1))
+	assert.NoError(t, findErr)
+	assert.Equal(t, key1, position.Key)
+
+	position2, find2Err := node.FindPositionForKey(uint32(7))
+	assert.NoError(t, find2Err)
+	assert.Equal(t, key2, position2.Key)
+}
