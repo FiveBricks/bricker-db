@@ -3,12 +3,14 @@ package operations
 import (
 	"bricker-db/btree/node"
 	pg "bricker-db/pager"
+	"errors"
 	"fmt"
 )
 
 type Breadcrumb struct {
 	pagedNode       *pg.PagedNode
 	index           uint32
+	key             uint32
 	isRightMostNode bool
 }
 
@@ -46,7 +48,7 @@ func findPosition(pager *pg.Pager, key uint32) ([]*Breadcrumb, error) {
 	var currentNode *pg.PagedNode
 	currentNode = rootPagedNode
 	var breadcrumbs []*Breadcrumb
-	breadcrumbs = append(breadcrumbs, &Breadcrumb{currentNode, 0, true})
+	breadcrumbs = append(breadcrumbs, &Breadcrumb{currentNode, 0, 0, true})
 	for {
 		if currentNode.GetNodeType() == node.LeafNodeType {
 			return breadcrumbs, nil
@@ -66,9 +68,9 @@ func findPosition(pager *pg.Pager, key uint32) ([]*Breadcrumb, error) {
 				return nil, readErr
 			}
 
-			currentNode = pagedNode
 			isRightMostNode := index == currentNode.Node.GetElementsCount()-1
-			breadcrumbs = append(breadcrumbs, &Breadcrumb{currentNode, index, isRightMostNode})
+			currentNode = pagedNode
+			breadcrumbs = append(breadcrumbs, &Breadcrumb{currentNode, index, keyRef.GetKey(), isRightMostNode})
 		}
 	}
 }
@@ -88,11 +90,12 @@ func propagateSplitUpdates(pager *pg.Pager, splitMetadata *node.SplitMetadata, b
 			return writeErr
 		}
 
+		maxKey, maxKeyErr := split.CreatedNode.GetMaxKey()
+		if maxKeyErr != nil {
+			return maxKeyErr
+		}
+
 		if parentNodeBreadcrumb == nil {
-			maxKey, maxKeyErr := split.CreatedNode.GetMaxKey()
-			if maxKeyErr != nil {
-				return maxKeyErr
-			}
 			// if no parent then we are splitting root
 			// create new root node
 			newRoot := node.NewEmptyInternalNode(node.INTERNAL_NODE_SIZE)
@@ -103,9 +106,44 @@ func propagateSplitUpdates(pager *pg.Pager, splitMetadata *node.SplitMetadata, b
 			return writeRootErr
 
 		}
-		// if not right most, just add split key to parent
-		// replace splitter, update new max value
+
+		parentNode, parentNodeOk := parentNodeBreadcrumb.pagedNode.Node.(*node.InternalNode)
+		if !parentNodeOk {
+			return errors.New("failed to cast parent node to internal node")
+		}
+
+		if !currentNodeBreadcrumb.isRightMostNode {
+			// update old key page ref key to created node
+			_, updateErr := parentNode.UpdateAtIndex(currentNodeBreadcrumb.index, currentNodeBreadcrumb.key, newPagedNode.Page)
+			if updateErr != nil {
+				return updateErr
+			}
+
+			// add new divider
+			insertResult, insertErr := parentNode.Insert(split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
+			if insertErr != nil {
+				return insertErr
+			}
+
+			split = insertResult.Metadata.Split
+
+		} else {
+			// update old key ref key and point to the old node
+			_, updateErr := parentNode.UpdateAtIndex(currentNodeBreadcrumb.index, split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
+			if updateErr != nil {
+				return updateErr
+			}
+
+			// add new divider
+			insertResult, insertErr := parentNode.Insert(maxKey, newPagedNode.Page)
+			if insertErr != nil {
+				return insertErr
+			}
+
+			split = insertResult.Metadata.Split
+		}
 	}
+
 	return nil
 }
 

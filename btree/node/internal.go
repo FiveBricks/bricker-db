@@ -71,6 +71,31 @@ func (i *InternalNode) Insert(key uint32, pageId uint32) (*InternalNodeInsertRes
 	return &InternalNodeInsertResult{keyRef, &InsertMetadata{nil}}, nil
 }
 
+func (i *InternalNode) UpdateAtIndex(index uint32, key uint32, pageId uint32) (*KeyPageReference, error) {
+	if !(index < i.header.ElementsCount) {
+		return nil, errors.New("failed to update key page ref: does not exist")
+	}
+
+	// create key
+	keyPageRef := &KeyPageReference{
+		key,
+		pageId,
+	}
+
+	keyData, encodingErr := EncodeKeyPageRef(keyPageRef)
+	if encodingErr != nil {
+		return nil, fmt.Errorf("failed to encode key data ref: %v", encodingErr)
+	}
+
+	offsetStart := index * KEY_PAGE_REF_SIZE
+
+	if numOfCopiedBytes := copy(i.buf[offsetStart:(offsetStart+KEY_PAGE_REF_SIZE)], keyData); numOfCopiedBytes != KEY_PAGE_REF_SIZE {
+		return nil, ErrFailedToInsertKeyPageRef
+	}
+
+	return keyPageRef, nil
+}
+
 func (i *InternalNode) insertToIndex(index uint32, key uint32, pageId uint32) (*KeyPageReference, error) {
 	if i.header.GetAvailableSpace() < KEY_PAGE_REF_SIZE {
 		return nil, ErrNoAvailableSpaceForInsert
