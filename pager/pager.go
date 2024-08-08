@@ -155,6 +155,22 @@ func (p *Pager) WriteNewNode(node node.Node) (*PagedNode, error) {
 	return pagedNode, nil
 }
 
+func (p *Pager) WriteNewRootNode(node node.Node) (*PagedNode, error) {
+	newPageId := p.header.PageCount
+	pagedNode := &PagedNode{newPageId, node}
+	if writeErr := p.WritePagedNode(pagedNode); writeErr != nil {
+		return nil, writeErr
+	}
+
+	p.header.PageCount += 1
+	p.header.RootPageId = newPageId
+
+	if err := p.FlushDatabaseHeader(); err != nil {
+		return nil, fmt.Errorf("failed to update database header after writing a new page: %v", err)
+	}
+	return pagedNode, nil
+}
+
 func (p *Pager) WritePagedNode(pagedNode *PagedNode) error {
 	return p.WriteNodeToPage(pagedNode.Page, pagedNode.Node)
 }

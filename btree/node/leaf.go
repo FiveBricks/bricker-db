@@ -198,7 +198,7 @@ func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResul
 		insertedKeyRef = keyRef
 	}
 
-	return &LeafNodeInsertResult{insertedKeyRef, &InsertMetadata{&SplitMetadata{splitKey, newNode}}}, nil
+	return &LeafNodeInsertResult{insertedKeyRef, &InsertMetadata{&SplitMetadata{splitKey, newNode, l}}}, nil
 }
 
 func (l *LeafNode) GetKeyDataRefByIndex(index uint32) (*KeyDataReference, error) {
@@ -240,4 +240,19 @@ func (l *LeafNode) GetHeader() *NodeHeader {
 
 func (l *LeafNode) GetBuffer() []byte {
 	return l.buf
+}
+
+func (l *LeafNode) GetMaxKey() (uint32, error) {
+	count := l.GetElementsCount()
+	if !(count > 0) {
+		return 0, errors.New("node does not contain any elements")
+
+	}
+
+	keyRef, keyRefErr := l.GetKeyRefeferenceByIndex(count - 1)
+	if keyRefErr != nil {
+		return 0, keyRefErr
+	}
+
+	return keyRef.GetKey(), nil
 }

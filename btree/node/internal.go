@@ -8,6 +8,8 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+const INTERNAL_NODE_SIZE = 4096
+
 type InternalNode struct {
 	header *NodeHeader
 	buf    []byte
@@ -187,7 +189,7 @@ func (i *InternalNode) splitAndInsert(key uint32, pageId uint32) (*InternalNodeI
 		insertedKeyRef = keyRef
 	}
 
-	return &InternalNodeInsertResult{insertedKeyRef, &InsertMetadata{&SplitMetadata{splitKey, newNode}}}, nil
+	return &InternalNodeInsertResult{insertedKeyRef, &InsertMetadata{&SplitMetadata{splitKey, newNode, i}}}, nil
 }
 
 func (i *InternalNode) append(key uint32, pageId uint32) (*KeyPageReference, error) {
@@ -212,10 +214,10 @@ func (i *InternalNode) GetBuffer() []byte {
 	return i.buf
 }
 
-func (i *InternalNode) FindPositionForKey(key uint32) (*KeyPageReference, error) {
+func (i *InternalNode) FindPositionForKey(key uint32) (uint32, *KeyPageReference, error) {
 	_, index, err := FindPositionForKey(i, key)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
 	if index == i.GetElementsCount() {
@@ -224,8 +226,23 @@ func (i *InternalNode) FindPositionForKey(key uint32) (*KeyPageReference, error)
 
 	keyRef, keyRefErr := i.getKeyPageRefByIndex(index)
 	if keyRefErr != nil {
-		return nil, keyRefErr
+		return 0, nil, keyRefErr
 	}
 
-	return keyRef, nil
+	return index, keyRef, nil
+}
+
+func (i *InternalNode) GetMaxKey() (uint32, error) {
+	count := i.GetElementsCount()
+	if !(count > 0) {
+		return 0, errors.New("node does not contain any elements")
+
+	}
+
+	keyRef, keyRefErr := i.GetKeyRefeferenceByIndex(count - 1)
+	if keyRefErr != nil {
+		return 0, keyRefErr
+	}
+
+	return keyRef.GetKey(), nil
 }

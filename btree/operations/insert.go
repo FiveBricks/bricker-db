@@ -7,8 +7,9 @@ import (
 )
 
 type Breadcrumb struct {
-	pagedNode *pg.PagedNode
-	isLeaf    bool
+	pagedNode       *pg.PagedNode
+	index           uint32
+	isRightMostNode bool
 }
 
 func Insert(pager *pg.Pager, key uint32, data []byte) error {
@@ -17,7 +18,8 @@ func Insert(pager *pg.Pager, key uint32, data []byte) error {
 		return searchErr
 	}
 
-	leafBreadcrumb, breadcrumbs := breadcrumbs[len(breadcrumbs)-1], breadcrumbs[:len(breadcrumbs)-1]
+	// leafBreadcrumb, breadcrumbs := breadcrumbs[len(breadcrumbs)-1], breadcrumbs[:len(breadcrumbs)-1]
+	leafBreadcrumb := breadcrumbs[len(breadcrumbs)-1]
 	leaf, leafOk := leafBreadcrumb.pagedNode.Node.(*node.LeafNode)
 	if !leafOk {
 		return fmt.Errorf("unable to cast to leaf node")
@@ -29,7 +31,7 @@ func Insert(pager *pg.Pager, key uint32, data []byte) error {
 	}
 
 	if insertResult.Metadata.Split != nil {
-		return propagateSplitUpdates(insertResult.Metadata.Split, breadcrumbs)
+		return propagateSplitUpdates(pager, insertResult.Metadata.Split, breadcrumbs)
 	}
 
 	return nil
@@ -44,8 +46,8 @@ func findPosition(pager *pg.Pager, key uint32) ([]*Breadcrumb, error) {
 	var currentNode *pg.PagedNode
 	currentNode = rootPagedNode
 	var breadcrumbs []*Breadcrumb
+	breadcrumbs = append(breadcrumbs, &Breadcrumb{currentNode, 0, true})
 	for {
-		breadcrumbs = append(breadcrumbs, &Breadcrumb{currentNode, false})
 		if currentNode.GetNodeType() == node.LeafNodeType {
 			return breadcrumbs, nil
 		} else {
@@ -54,7 +56,7 @@ func findPosition(pager *pg.Pager, key uint32) ([]*Breadcrumb, error) {
 				return nil, fmt.Errorf("failed to cast internal node")
 			}
 
-			keyRef, findErr := internalNode.FindPositionForKey(key)
+			index, keyRef, findErr := internalNode.FindPositionForKey(key)
 			if findErr != nil {
 				return nil, fmt.Errorf("failed to find position for %d: %w", key, findErr)
 			}
@@ -65,12 +67,52 @@ func findPosition(pager *pg.Pager, key uint32) ([]*Breadcrumb, error) {
 			}
 
 			currentNode = pagedNode
+			isRightMostNode := index == currentNode.Node.GetElementsCount()-1
+			breadcrumbs = append(breadcrumbs, &Breadcrumb{currentNode, index, isRightMostNode})
 		}
-
 	}
 }
 
-func propagateSplitUpdates(split *node.SplitMetadata, breadscrumbs []*Breadcrumb) error {
+func propagateSplitUpdates(pager *pg.Pager, splitMetadata *node.SplitMetadata, breadscrumbs []*Breadcrumb) error {
 	// todo: propagate changes
+	split := splitMetadata
+	breadcrumbsIndex := len(breadscrumbs) - 1
+	currentNodeBreadcrumb := getBreadcrumb(breadcrumbsIndex, breadscrumbs)
+	parentNodeBreadcrumb := getBreadcrumb(breadcrumbsIndex-1, breadscrumbs)
+	breadcrumbsIndex -= 1
+
+	for split != nil {
+		// flush the created node
+		newPagedNode, writeErr := pager.WriteNewNode(split.CreatedNode)
+		if writeErr != nil {
+			return writeErr
+		}
+
+		if parentNodeBreadcrumb == nil {
+			maxKey, maxKeyErr := split.CreatedNode.GetMaxKey()
+			if maxKeyErr != nil {
+				return maxKeyErr
+			}
+			// if no parent then we are splitting root
+			// create new root node
+			newRoot := node.NewEmptyInternalNode(node.INTERNAL_NODE_SIZE)
+			newRoot.Insert(split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
+			newRoot.Insert(maxKey, newPagedNode.Page)
+
+			_, writeRootErr := pager.WriteNewRootNode(newRoot)
+			return writeRootErr
+
+		}
+		// if not right most, just add split key to parent
+		// replace splitter, update new max value
+	}
+	return nil
+}
+
+func getBreadcrumb(index int, breadscrumbs []*Breadcrumb) *Breadcrumb {
+	if index < len(breadscrumbs) && index >= 0 {
+		return breadscrumbs[index]
+	}
+
 	return nil
 }

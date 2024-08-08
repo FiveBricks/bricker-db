@@ -9,4 +9,5 @@ type Node interface {
 	GetElementsCount() uint32
 	GetHeader() *NodeHeader
 	GetBuffer() []byte
+	GetMaxKey() (uint32, error)
 }

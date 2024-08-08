@@ -106,11 +106,11 @@ func TestInternalNodeFindPositionForKey(t *testing.T) {
 	_, insert2Err := node.Insert(key2, uint32(1))
 	assert.NoError(t, insert2Err)
 
-	position, findErr := node.FindPositionForKey(uint32(1))
+	_, position, findErr := node.FindPositionForKey(uint32(1))
 	assert.NoError(t, findErr)
 	assert.Equal(t, key1, position.Key)
 
-	position2, find2Err := node.FindPositionForKey(uint32(7))
+	_, position2, find2Err := node.FindPositionForKey(uint32(7))
 	assert.NoError(t, find2Err)
 	assert.Equal(t, key2, position2.Key)
 }
