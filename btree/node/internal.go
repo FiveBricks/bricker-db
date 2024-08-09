@@ -63,12 +63,17 @@ func (i *InternalNode) Insert(key uint32, pageId uint32) (*InternalNodeInsertRes
 		return nil, errors.New("insert of existing keys is not supported")
 	}
 
+	var highKeyUpdate *HighKeyUpdate
+	if index == i.GetElementsCount() {
+		highKeyUpdate = &HighKeyUpdate{key}
+	}
+
 	keyRef, insertErr := i.insertToIndex(index, key, pageId)
 	if insertErr != nil {
 		return nil, insertErr
 	}
 
-	return &InternalNodeInsertResult{keyRef, &InsertMetadata{nil}}, nil
+	return &InternalNodeInsertResult{keyRef, &InsertMetadata{nil, highKeyUpdate}}, nil
 }
 
 func (i *InternalNode) UpdateAtIndex(index uint32, key uint32, pageId uint32) (*KeyPageReference, error) {
@@ -171,6 +176,11 @@ func (i *InternalNode) splitAndInsert(key uint32, pageId uint32) (*InternalNodeI
 		return nil, errors.New("cannot insert to an existing position")
 	}
 
+	var highKeyUpdate *HighKeyUpdate
+	if int(newItemPosition) == len(keyRefs) {
+		highKeyUpdate = &HighKeyUpdate{key}
+	}
+
 	newItemKeyRef := &KeyPageReference{key, 0}
 	keyRefsCommit = slices.Insert(keyRefsCommit, int(newItemPosition), &KeyPageReferenceCommit{newItemKeyRef, false})
 
@@ -214,7 +224,7 @@ func (i *InternalNode) splitAndInsert(key uint32, pageId uint32) (*InternalNodeI
 		insertedKeyRef = keyRef
 	}
 
-	return &InternalNodeInsertResult{insertedKeyRef, &InsertMetadata{&SplitMetadata{splitKey, newNode, i}}}, nil
+	return &InternalNodeInsertResult{insertedKeyRef, &InsertMetadata{&SplitMetadata{splitKey, newNode, i}, highKeyUpdate}}, nil
 }
 
 func (i *InternalNode) append(key uint32, pageId uint32) (*KeyPageReference, error) {

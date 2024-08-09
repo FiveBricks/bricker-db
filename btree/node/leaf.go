@@ -63,12 +63,17 @@ func (l *LeafNode) Insert(key uint32, data []byte) (*LeafNodeInsertResult, error
 		return nil, errors.New("insert of existing keys is not supported")
 	}
 
+	var highKeyUpdate *HighKeyUpdate
+	if index == l.GetElementsCount() {
+		highKeyUpdate = &HighKeyUpdate{key}
+	}
+
 	keyRef, insertErr := l.insertToIndex(index, key, data)
 	if insertErr != nil {
 		return nil, insertErr
 	}
 
-	return &LeafNodeInsertResult{keyRef, &InsertMetadata{nil}}, nil
+	return &LeafNodeInsertResult{keyRef, &InsertMetadata{nil, highKeyUpdate}}, nil
 }
 
 func (l *LeafNode) insertToIndex(index uint32, key uint32, data []byte) (*KeyDataReference, error) {
@@ -148,6 +153,11 @@ func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResul
 		return nil, errors.New("cannot insert to an existing position")
 	}
 
+	var highKeyUpdate *HighKeyUpdate
+	if int(newItemPosition) == len(keyRefs) {
+		highKeyUpdate = &HighKeyUpdate{key}
+	}
+
 	newItemKeyRef := &KeyDataReference{key, 0, 0}
 	keyRefsCommit = slices.Insert(keyRefsCommit, int(newItemPosition), &KeyDataReferenceCommit{newItemKeyRef, false})
 
@@ -198,7 +208,7 @@ func (l *LeafNode) splitAndInsert(key uint32, data []byte) (*LeafNodeInsertResul
 		insertedKeyRef = keyRef
 	}
 
-	return &LeafNodeInsertResult{insertedKeyRef, &InsertMetadata{&SplitMetadata{splitKey, newNode, l}}}, nil
+	return &LeafNodeInsertResult{insertedKeyRef, &InsertMetadata{&SplitMetadata{splitKey, newNode, l}, highKeyUpdate}}, nil
 }
 
 func (l *LeafNode) GetKeyDataRefByIndex(index uint32) (*KeyDataReference, error) {

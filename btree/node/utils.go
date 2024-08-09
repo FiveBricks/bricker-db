@@ -25,6 +25,7 @@ func FindPositionForKey(node Node, key uint32) (bool, uint32, error) {
 }
 
 func FindPositionForKeyInRefs[T KeyReference](key uint32, refs []T) (bool, uint32) {
+	// TODO: just use int
 	start := uint32(0)
 	end := uint32(len(refs))
 	for start < end {
