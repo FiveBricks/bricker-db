@@ -32,7 +32,9 @@ func Insert(pager *pg.Pager, key uint32, data []byte) error {
 		return insertErr
 	}
 
-	// TODO: persist results in the leaf node
+	if writeErr := pager.WritePagedNode(leafBreadcrumb.pagedNode); writeErr != nil {
+		return writeErr
+	}
 
 	return propagateInsertUpdates(pager, insertResult.Metadata, breadcrumbs)
 }
