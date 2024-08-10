@@ -76,8 +76,8 @@ func (i *InternalNode) Insert(key uint32, pageId uint32) (*InternalNodeInsertRes
 	return &InternalNodeInsertResult{keyRef, &InsertMetadata{nil, highKeyUpdate}}, nil
 }
 
-func (i *InternalNode) UpdateAtIndex(index uint32, key uint32, pageId uint32) (*KeyPageReference, error) {
-	if !(index < i.header.ElementsCount) {
+func (i *InternalNode) UpdateAtIndex(index uint32, key uint32, pageId uint32) (*HighKeyUpdate, error) {
+	if !(index < i.GetElementsCount()) {
 		return nil, errors.New("failed to update key page ref: does not exist")
 	}
 
@@ -98,7 +98,12 @@ func (i *InternalNode) UpdateAtIndex(index uint32, key uint32, pageId uint32) (*
 		return nil, ErrFailedToInsertKeyPageRef
 	}
 
-	return keyPageRef, nil
+	// if we are updating the high key
+	if index == (i.GetElementsCount() - 1) {
+		return &HighKeyUpdate{key}, nil
+	}
+
+	return nil, nil
 }
 
 func (i *InternalNode) insertToIndex(index uint32, key uint32, pageId uint32) (*KeyPageReference, error) {

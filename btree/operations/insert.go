@@ -32,6 +32,8 @@ func Insert(pager *pg.Pager, key uint32, data []byte) error {
 		return insertErr
 	}
 
+	// TODO: persist results in the leaf node
+
 	return propagateInsertUpdates(pager, insertResult.Metadata, breadcrumbs)
 }
 
@@ -100,6 +102,9 @@ func handleSplit(pager *pg.Pager, split *node.SplitMetadata, currentNodeBreadcru
 		return nil, errors.New("failed to cast parent node to internal node")
 	}
 
+	var insertResult *node.InternalNodeInsertResult
+	var insertErr error
+
 	if !currentNodeBreadcrumb.isRightMostNode {
 		// update old key page ref key to created node
 		_, updateErr := parentNode.UpdateAtIndex(currentNodeBreadcrumb.index, currentNodeBreadcrumb.key, newPagedNode.Page)
@@ -108,13 +113,7 @@ func handleSplit(pager *pg.Pager, split *node.SplitMetadata, currentNodeBreadcru
 		}
 
 		// add new divider
-		insertResult, insertErr := parentNode.Insert(split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
-		if insertErr != nil {
-			return nil, insertErr
-		}
-
-		return insertResult.Metadata, nil
-
+		insertResult, insertErr = parentNode.Insert(split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
 	} else {
 		// update old key ref key and point to the old node
 		_, updateErr := parentNode.UpdateAtIndex(currentNodeBreadcrumb.index, split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
@@ -123,18 +122,42 @@ func handleSplit(pager *pg.Pager, split *node.SplitMetadata, currentNodeBreadcru
 		}
 
 		// add new divider
-		insertResult, insertErr := parentNode.Insert(maxKey, newPagedNode.Page)
-		if insertErr != nil {
-			return nil, insertErr
-		}
-
-		return insertResult.Metadata, nil
+		insertResult, insertErr = parentNode.Insert(maxKey, newPagedNode.Page)
 	}
+
+	if insertErr != nil {
+		return nil, insertErr
+	}
+
+	// persist changes
+	if writeErr := pager.WritePagedNode(parentNodeBreadcrumb.pagedNode); writeErr != nil {
+		return nil, writeErr
+	}
+	return insertResult.Metadata, nil
 }
 
 func handleNewHighKeyInserted(pager *pg.Pager, update *node.HighKeyUpdate, currentNodeBreadcrumb *Breadcrumb, parentNodeBreadcrumb *Breadcrumb) (*node.InsertMetadata, error) {
-	// TODO: propagate high key update
-	return nil, nil
+	// we only need to propagate changes for right most nodes
+	if !currentNodeBreadcrumb.isRightMostNode {
+		return nil, nil
+	}
+
+	parentNode, parentNodeOk := parentNodeBreadcrumb.pagedNode.Node.(*node.InternalNode)
+	if !parentNodeOk {
+		return nil, errors.New("failed to cast parent node to internal node")
+	}
+
+	parentHighKeyUpdate, updateErr := parentNode.UpdateAtIndex(currentNodeBreadcrumb.index, update.NewHighKey, currentNodeBreadcrumb.pagedNode.Page)
+	if updateErr != nil {
+		return nil, updateErr
+	}
+
+	// persist changes
+	if writeErr := pager.WritePagedNode(parentNodeBreadcrumb.pagedNode); writeErr != nil {
+		return nil, writeErr
+	}
+
+	return &node.InsertMetadata{Split: nil, HighKey: parentHighKeyUpdate}, nil
 }
 
 func propagateInsertUpdates(pager *pg.Pager, metadata *node.InsertMetadata, breadscrumbs []*Breadcrumb) error {
