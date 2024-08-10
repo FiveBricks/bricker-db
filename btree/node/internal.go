@@ -146,7 +146,7 @@ func (i *InternalNode) GetElementsCount() uint32 {
 	return i.header.ElementsCount
 }
 
-func (i *InternalNode) getKeyPageRefByIndex(index uint32) (*KeyPageReference, error) {
+func (i *InternalNode) GetKeyPageRefByIndex(index uint32) (*KeyPageReference, error) {
 	if !(index < i.GetElementsCount()) {
 		return nil, ErrKeyRefAtIndexDoesNotExist
 	}
@@ -157,13 +157,13 @@ func (i *InternalNode) getKeyPageRefByIndex(index uint32) (*KeyPageReference, er
 
 func (i *InternalNode) GetKeyRefeferenceByIndex(index uint32) (KeyReference, error) {
 	// wrapper to accommodate the node interface signature
-	return i.getKeyPageRefByIndex(index)
+	return i.GetKeyPageRefByIndex(index)
 }
 
 func (i *InternalNode) splitAndInsert(key uint32, pageId uint32) (*InternalNodeInsertResult, error) {
 	var keyRefs []*KeyPageReference
 	for index := uint32(0); index < i.header.ElementsCount; index++ {
-		ref, err := i.getKeyPageRefByIndex(index)
+		ref, err := i.GetKeyPageRefByIndex(index)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +264,7 @@ func (i *InternalNode) FindPositionForKey(key uint32) (uint32, *KeyPageReference
 		index = i.GetElementsCount() - 1
 	}
 
-	keyRef, keyRefErr := i.getKeyPageRefByIndex(index)
+	keyRef, keyRefErr := i.GetKeyPageRefByIndex(index)
 	if keyRefErr != nil {
 		return 0, nil, keyRefErr
 	}

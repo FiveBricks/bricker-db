@@ -34,12 +34,12 @@ func TestInsertBeforeExistingElementIntoInternalNode(t *testing.T) {
 	key2PageRef := insert2Result.InsertedKeyPageRef
 
 	// check order
-	firstKeyInNode, getKeyErr := node.getKeyPageRefByIndex(0)
+	firstKeyInNode, getKeyErr := node.GetKeyPageRefByIndex(0)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key2PageRef, firstKeyInNode)
 	assert.Equal(t, key2Page, firstKeyInNode.PageId)
 
-	secondKeyInNode, getKeyErr := node.getKeyPageRefByIndex(1)
+	secondKeyInNode, getKeyErr := node.GetKeyPageRefByIndex(1)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key1PageRef, secondKeyInNode)
 	assert.Equal(t, key1Page, secondKeyInNode.PageId)
@@ -71,28 +71,28 @@ func TestInsertAndSplitIntoInternalNode(t *testing.T) {
 
 	// check old leaf
 	assert.Equal(t, uint32(2), node.GetElementsCount())
-	firstKeyInOldLeaf, getKeyErr := node.getKeyPageRefByIndex(0)
+	firstKeyInOldLeaf, getKeyErr := node.GetKeyPageRefByIndex(0)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key2PageRef, firstKeyInOldLeaf)
 	assert.Equal(t, key2Page, firstKeyInOldLeaf.PageId)
 
-	secondKeyInOldLeaf, getKeyErr := node.getKeyPageRefByIndex(1)
+	secondKeyInOldLeaf, getKeyErr := node.GetKeyPageRefByIndex(1)
 	assert.NoError(t, getKeyErr)
 	assert.Equal(t, key3PageRef, secondKeyInOldLeaf)
 	assert.Equal(t, key3Page, secondKeyInOldLeaf.PageId)
 
-	_, getKey2Err := node.getKeyPageRefByIndex(2)
+	_, getKey2Err := node.GetKeyPageRefByIndex(2)
 	assert.ErrorIs(t, ErrKeyRefAtIndexDoesNotExist, getKey2Err)
 
 	// check new leaf
 	newLeaf := insert3Result.Metadata.Split.CreatedNode.(*InternalNode)
 	assert.Equal(t, uint32(1), newLeaf.GetElementsCount())
-	firstKeyInNewLeaf, getKeyInNewLeafErr := newLeaf.getKeyPageRefByIndex(0)
+	firstKeyInNewLeaf, getKeyInNewLeafErr := newLeaf.GetKeyPageRefByIndex(0)
 	assert.NoError(t, getKeyInNewLeafErr)
 	assert.Equal(t, key1PageRef, firstKeyInNewLeaf)
 	assert.Equal(t, key1Page, firstKeyInNewLeaf.PageId)
 
-	_, getKey2InNewLeafErr := newLeaf.getKeyPageRefByIndex(1)
+	_, getKey2InNewLeafErr := newLeaf.GetKeyPageRefByIndex(1)
 	assert.ErrorIs(t, ErrKeyRefAtIndexDoesNotExist, getKey2InNewLeafErr)
 }
 
