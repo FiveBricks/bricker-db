@@ -20,7 +20,6 @@ func Insert(pager *pg.Pager, key uint32, data []byte) error {
 		return searchErr
 	}
 
-	// leafBreadcrumb, breadcrumbs := breadcrumbs[len(breadcrumbs)-1], breadcrumbs[:len(breadcrumbs)-1]
 	leafBreadcrumb := breadcrumbs[len(breadcrumbs)-1]
 	leaf, leafOk := leafBreadcrumb.pagedNode.Node.(*node.LeafNode)
 	if !leafOk {
@@ -90,10 +89,19 @@ func handleSplit(pager *pg.Pager, split *node.SplitMetadata, currentNodeBreadcru
 	if parentNodeBreadcrumb == nil {
 		// if no parent then we are splitting root
 		// create new root node
+		fmt.Println("inserting into new root")
 		newRoot := node.NewEmptyInternalNode(node.INTERNAL_NODE_SIZE)
-		newRoot.Insert(split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
-		newRoot.Insert(maxKey, newPagedNode.Page)
+		_, insert1Err := newRoot.Insert(split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
+		if insert1Err != nil {
+			return nil, insert1Err
+		}
 
+		_, insert2Err := newRoot.Insert(maxKey, newPagedNode.Page)
+		if insert2Err != nil {
+			return nil, insert2Err
+		}
+
+		fmt.Println("inserting into new root")
 		_, writeRootErr := pager.WriteNewRootNode(newRoot)
 		return nil, writeRootErr
 
@@ -139,6 +147,11 @@ func handleSplit(pager *pg.Pager, split *node.SplitMetadata, currentNodeBreadcru
 }
 
 func handleNewHighKeyInserted(pager *pg.Pager, update *node.HighKeyUpdate, currentNodeBreadcrumb *Breadcrumb, parentNodeBreadcrumb *Breadcrumb) (*node.InsertMetadata, error) {
+	// if there is no parent we don't need to propagate any changes
+	if parentNodeBreadcrumb == nil {
+		return nil, nil
+	}
+
 	// we only need to propagate changes for right most nodes
 	if !currentNodeBreadcrumb.isRightMostNode {
 		return nil, nil
@@ -167,6 +180,11 @@ func propagateInsertUpdates(pager *pg.Pager, metadata *node.InsertMetadata, brea
 	breadcrumbsIndex := len(breadscrumbs) - 1
 
 	for true {
+		if insertMetadata == nil {
+			// done
+			return nil
+		}
+
 		currentNodeBreadcrumb := getBreadcrumb(breadcrumbsIndex, breadscrumbs)
 		parentNodeBreadcrumb := getBreadcrumb(breadcrumbsIndex-1, breadscrumbs)
 		breadcrumbsIndex -= 1

@@ -10,7 +10,11 @@ func Init(pager *pg.Pager) error {
 		return nil
 	}
 
-	newRoot := node.NewEmptyLeafNode(node.LEAF_NODE_SIZE)
+	return initRootNode(pager, node.LEAF_NODE_SIZE)
+}
+
+func initRootNode(pager *pg.Pager, size uint32) error {
+	newRoot := node.NewEmptyLeafNode(size)
 	_, writeErr := pager.WriteNewRootNode(newRoot)
 	return writeErr
 }
