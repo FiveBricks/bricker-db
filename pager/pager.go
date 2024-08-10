@@ -67,6 +67,10 @@ func (p *Pager) FlushDatabaseHeader() error {
 	return p.header.WriteToFile(p.file)
 }
 
+func (p *Pager) RootNodeInitialized() bool {
+	return p.header.RootNodeInitialized
+}
+
 func (p *Pager) ReadPage(pageId uint32) ([]byte, error) {
 	pageData := make([]byte, PAGE_SIZE)
 	offset := PageFileOffset(pageId)

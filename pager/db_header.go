@@ -12,17 +12,19 @@ const DATABASE_HEADER_SIZE = 100
 const MAGIC_STRING = "my db"
 
 type DatabaseHeader struct {
-	MagicString   [len(MAGIC_STRING)]byte
-	PageSizeBytes uint32
-	PageCount     uint32
-	RootPageId    uint32
+	MagicString         [len(MAGIC_STRING)]byte
+	PageSizeBytes       uint32
+	PageCount           uint32
+	RootPageId          uint32
+	RootNodeInitialized bool
 }
 
 func NewDefaultDatabaseHeader() *DatabaseHeader {
 	header := &DatabaseHeader{
-		PageSizeBytes: 4096,
-		PageCount:     0,
-		RootPageId:    0,
+		PageSizeBytes:       4096,
+		PageCount:           0,
+		RootPageId:          0,
+		RootNodeInitialized: false,
 	}
 
 	copy(header.MagicString[:], MAGIC_STRING)

@@ -8,6 +8,8 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+const LEAF_NODE_SIZE = 4096
+
 type LeafNode struct {
 	header *NodeHeader
 	buf    []byte
