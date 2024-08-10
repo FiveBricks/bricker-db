@@ -32,11 +32,7 @@ func Insert(pager *pg.Pager, key uint32, data []byte) error {
 		return insertErr
 	}
 
-	if insertResult.Metadata.Split != nil {
-		return propagateSplitUpdates(pager, insertResult.Metadata.Split, breadcrumbs)
-	}
-
-	return nil
+	return propagateInsertUpdates(pager, insertResult.Metadata, breadcrumbs)
 }
 
 func findPosition(pager *pg.Pager, key uint32) ([]*Breadcrumb, error) {
@@ -75,73 +71,98 @@ func findPosition(pager *pg.Pager, key uint32) ([]*Breadcrumb, error) {
 	}
 }
 
-func propagateSplitUpdates(pager *pg.Pager, splitMetadata *node.SplitMetadata, breadscrumbs []*Breadcrumb) error {
-	// todo: propagate changes
-	split := splitMetadata
+func handleSplit(pager *pg.Pager, split *node.SplitMetadata, currentNodeBreadcrumb *Breadcrumb, parentNodeBreadcrumb *Breadcrumb) (*node.InsertMetadata, error) {
+	// flush the created node
+	newPagedNode, writeErr := pager.WriteNewNode(split.CreatedNode)
+	if writeErr != nil {
+		return nil, writeErr
+	}
+
+	maxKey, maxKeyErr := split.CreatedNode.GetMaxKey()
+	if maxKeyErr != nil {
+		return nil, maxKeyErr
+	}
+
+	if parentNodeBreadcrumb == nil {
+		// if no parent then we are splitting root
+		// create new root node
+		newRoot := node.NewEmptyInternalNode(node.INTERNAL_NODE_SIZE)
+		newRoot.Insert(split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
+		newRoot.Insert(maxKey, newPagedNode.Page)
+
+		_, writeRootErr := pager.WriteNewRootNode(newRoot)
+		return nil, writeRootErr
+
+	}
+
+	parentNode, parentNodeOk := parentNodeBreadcrumb.pagedNode.Node.(*node.InternalNode)
+	if !parentNodeOk {
+		return nil, errors.New("failed to cast parent node to internal node")
+	}
+
+	if !currentNodeBreadcrumb.isRightMostNode {
+		// update old key page ref key to created node
+		_, updateErr := parentNode.UpdateAtIndex(currentNodeBreadcrumb.index, currentNodeBreadcrumb.key, newPagedNode.Page)
+		if updateErr != nil {
+			return nil, updateErr
+		}
+
+		// add new divider
+		insertResult, insertErr := parentNode.Insert(split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
+		if insertErr != nil {
+			return nil, insertErr
+		}
+
+		return insertResult.Metadata, nil
+
+	} else {
+		// update old key ref key and point to the old node
+		_, updateErr := parentNode.UpdateAtIndex(currentNodeBreadcrumb.index, split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
+		if updateErr != nil {
+			return nil, updateErr
+		}
+
+		// add new divider
+		insertResult, insertErr := parentNode.Insert(maxKey, newPagedNode.Page)
+		if insertErr != nil {
+			return nil, insertErr
+		}
+
+		return insertResult.Metadata, nil
+	}
+}
+
+func handleNewHighKeyInserted(pager *pg.Pager, update *node.HighKeyUpdate, currentNodeBreadcrumb *Breadcrumb, parentNodeBreadcrumb *Breadcrumb) (*node.InsertMetadata, error) {
+	// TODO: propagate high key update
+	return nil, nil
+}
+
+func propagateInsertUpdates(pager *pg.Pager, metadata *node.InsertMetadata, breadscrumbs []*Breadcrumb) error {
+	insertMetadata := metadata
 	breadcrumbsIndex := len(breadscrumbs) - 1
-	currentNodeBreadcrumb := getBreadcrumb(breadcrumbsIndex, breadscrumbs)
-	parentNodeBreadcrumb := getBreadcrumb(breadcrumbsIndex-1, breadscrumbs)
-	breadcrumbsIndex -= 1
 
-	for split != nil {
-		// flush the created node
-		newPagedNode, writeErr := pager.WriteNewNode(split.CreatedNode)
-		if writeErr != nil {
-			return writeErr
-		}
+	for true {
+		currentNodeBreadcrumb := getBreadcrumb(breadcrumbsIndex, breadscrumbs)
+		parentNodeBreadcrumb := getBreadcrumb(breadcrumbsIndex-1, breadscrumbs)
+		breadcrumbsIndex -= 1
 
-		maxKey, maxKeyErr := split.CreatedNode.GetMaxKey()
-		if maxKeyErr != nil {
-			return maxKeyErr
-		}
-
-		if parentNodeBreadcrumb == nil {
-			// if no parent then we are splitting root
-			// create new root node
-			newRoot := node.NewEmptyInternalNode(node.INTERNAL_NODE_SIZE)
-			newRoot.Insert(split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
-			newRoot.Insert(maxKey, newPagedNode.Page)
-
-			_, writeRootErr := pager.WriteNewRootNode(newRoot)
-			return writeRootErr
-
-		}
-
-		parentNode, parentNodeOk := parentNodeBreadcrumb.pagedNode.Node.(*node.InternalNode)
-		if !parentNodeOk {
-			return errors.New("failed to cast parent node to internal node")
-		}
-
-		if !currentNodeBreadcrumb.isRightMostNode {
-			// update old key page ref key to created node
-			_, updateErr := parentNode.UpdateAtIndex(currentNodeBreadcrumb.index, currentNodeBreadcrumb.key, newPagedNode.Page)
-			if updateErr != nil {
-				return updateErr
+		if insertMetadata.Split != nil {
+			var splitErr error
+			insertMetadata, splitErr = handleSplit(pager, insertMetadata.Split, currentNodeBreadcrumb, parentNodeBreadcrumb)
+			if splitErr != nil {
+				return splitErr
 			}
-
-			// add new divider
-			insertResult, insertErr := parentNode.Insert(split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
-			if insertErr != nil {
-				return insertErr
+		} else if insertMetadata.HighKey != nil {
+			var highKeyUpdateErr error
+			insertMetadata, highKeyUpdateErr = handleNewHighKeyInserted(pager, insertMetadata.HighKey, currentNodeBreadcrumb, parentNodeBreadcrumb)
+			if highKeyUpdateErr != nil {
+				return highKeyUpdateErr
 			}
-
-			split = insertResult.Metadata.Split
-
 		} else {
-			// update old key ref key and point to the old node
-			_, updateErr := parentNode.UpdateAtIndex(currentNodeBreadcrumb.index, split.SplitKey, currentNodeBreadcrumb.pagedNode.Page)
-			if updateErr != nil {
-				return updateErr
-			}
-
-			// add new divider
-			insertResult, insertErr := parentNode.Insert(maxKey, newPagedNode.Page)
-			if insertErr != nil {
-				return insertErr
-			}
-
-			split = insertResult.Metadata.Split
+			// done
+			return nil
 		}
+
 	}
 
 	return nil
