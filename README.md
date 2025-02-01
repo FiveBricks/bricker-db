@@ -1,5 +1,5 @@
 # Bricker DB
-Second iteration of writing database engine from scratch for fun.
+Second iteration of writing database engine from scratch for fun. The basis for this implementation are B+ Trees.
 
 ## How to run
 There is no public API yet. At the moment, I am developing the internals and validating through testing.
@@ -23,4 +23,4 @@ $ make test
   - [ ] Validate operations
 - [ ] Parse SQL
 - [ ] Transactions
-- [ ] ACID properties?
+- [ ] ACID properties
